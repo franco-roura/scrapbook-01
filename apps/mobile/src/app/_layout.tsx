@@ -47,6 +47,7 @@ export default function RootLayout() {
           />
           <Stack.Screen name="sign-in" options={{ title: 'Sign in' }} />
           <Stack.Screen name="item/[id]" options={{ title: 'Item' }} />
+          <Stack.Screen name="graph" options={{ title: 'Graph' }} />
           <Stack.Screen name="share" options={{ presentation: 'modal', headerShown: false }} />
         </Stack>
       </AndroidShareListener>

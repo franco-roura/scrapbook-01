@@ -9,6 +9,7 @@ import { api } from '../../lib/client';
 import { platformLabel } from '../../lib/links';
 import { DESCRIPTION_MAX } from '../../share/ShareSheet';
 import { CategoryPanel } from '../../ui/CategoryPanel';
+import { LocalGraph } from '../../graph/LocalGraph';
 import { Button, Chip, Field, HudLabel, Panel, Text, colors } from '../../ui/module01';
 
 export default function ItemScreen() {
@@ -121,6 +122,9 @@ export default function ItemScreen() {
         </Panel>
 
         <CategoryPanel item={item} onChange={setItem} />
+
+        {/* Tapping a neighbor swaps this screen's item in place (Obsidian-style). */}
+        <LocalGraph itemId={item.id} onOpen={(next) => router.setParams({ id: next })} />
 
         <Button variant="destructive" onPress={remove}>
           Delete

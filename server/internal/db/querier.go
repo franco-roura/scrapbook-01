@@ -37,6 +37,8 @@ type Querier interface {
 	ListCategoriesForClassify(ctx context.Context, userID uuid.UUID) ([]ListCategoriesForClassifyRow, error)
 	ListDeviceTokens(ctx context.Context, userID uuid.UUID) ([]string, error)
 	ListEdgesForUser(ctx context.Context, userID uuid.UUID) ([]ListEdgesForUserRow, error)
+	// The newest items for the graph view, with their categories.
+	ListGraphItems(ctx context.Context, arg ListGraphItemsParams) ([]ListGraphItemsRow, error)
 	// Newest first, paged with a (created_at, id) cursor.
 	ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error)
 	MarkClassified(ctx context.Context, arg MarkClassifiedParams) (int64, error)

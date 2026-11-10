@@ -75,6 +75,8 @@ func (s *Server) routes(authMW func(http.Handler) http.Handler) http.Handler {
 	v1.HandleFunc("GET /v1/items/{id}", s.getItem)
 	v1.HandleFunc("PATCH /v1/items/{id}", s.updateItem)
 	v1.HandleFunc("DELETE /v1/items/{id}", s.deleteItem)
+	v1.HandleFunc("GET /v1/items/{id}/neighbors", s.getNeighbors)
+	v1.HandleFunc("GET /v1/graph", s.getGraph)
 	v1.HandleFunc("GET /v1/categories", s.listCategories)
 	v1.HandleFunc("POST /v1/categories", s.createCategory)
 	v1.HandleFunc("PUT /v1/devices/{token}", s.registerDevice)

@@ -33,6 +33,7 @@ type fakeQueries struct {
 	catOwner   map[uuid.UUID]uuid.UUID
 	feedback   []db.InsertCategoryFeedbackParams
 	devices    map[string]db.UpsertDeviceParams
+	edges      map[uuid.UUID][]db.ListEdgesForUserRow
 	clock      time.Time
 }
 
@@ -493,5 +494,64 @@ func TestDevices(t *testing.T) {
 	h.do(user, "DELETE", "/v1/devices/"+tok, ``, nil)
 	if len(h.q.devices) != 0 {
 		t.Fatalf("delete kept the device")
+	}
+}
+
+func (f *fakeQueries) ListGraphItems(_ context.Context, a db.ListGraphItemsParams) ([]db.ListGraphItemsRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []db.ListGraphItemsRow
+	for id, it := range f.items {
+		if f.owner[id] == a.UserID {
+			out = append(out, db.ListGraphItemsRow{ID: id, Url: it.Url, Platform: it.Platform, Description: it.Description,
+				CategoryID: it.CategoryID, CategoryName: it.CategoryName})
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeQueries) ListEdgesForUser(_ context.Context, user uuid.UUID) ([]db.ListEdgesForUserRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.edges[user], nil
+}
+
+func TestGraphEndpoints(t *testing.T) {
+	h := newHarness(t)
+	user, stranger := uuid.New(), uuid.New()
+	var a, b, c itemJSON
+	h.do(user, "POST", "/v1/items", `{"url":"https://e.com/a","description":"alpha"}`, &a)
+	h.do(user, "POST", "/v1/items", `{"url":"https://e.com/b","description":"beta"}`, &b)
+	h.do(user, "POST", "/v1/items", `{"url":"https://e.com/c"}`, &c)
+	var cat categoryJSON
+	h.do(user, "POST", "/v1/categories", `{"name":"Letters"}`, &cat)
+	h.do(user, "PATCH", "/v1/items/"+a.ID.String(), `{"categoryId":"`+cat.ID.String()+`"}`, nil)
+	h.q.mu.Lock()
+	h.q.edges = map[uuid.UUID][]db.ListEdgesForUserRow{user: {{Src: a.ID, Dst: b.ID, Weight: 0.8}}}
+	h.q.mu.Unlock()
+
+	type graphJSON struct {
+		Nodes []struct{ ID, Kind, Label string }
+		Links []struct{ Source, Target, Kind string }
+	}
+	var g graphJSON
+	if code := h.do(user, "GET", "/v1/graph", "", &g); code != http.StatusOK || len(g.Nodes) != 4 || len(g.Links) != 2 {
+		t.Fatalf("graph: %d %+v", code, g)
+	}
+
+	var local graphJSON
+	h.do(user, "GET", "/v1/items/"+b.ID.String()+"/neighbors?depth=1", "", &local)
+	if len(local.Nodes) != 3 || local.Nodes[0].ID != b.ID.String() { // b, a, Letters
+		t.Fatalf("neighbors: %+v", local)
+	}
+	if code := h.do(user, "GET", "/v1/items/"+b.ID.String()+"/neighbors?depth=3", "", nil); code != http.StatusBadRequest {
+		t.Fatalf("depth 3: %d", code)
+	}
+	if code := h.do(stranger, "GET", "/v1/items/"+b.ID.String()+"/neighbors", "", nil); code != http.StatusNotFound {
+		t.Fatalf("stranger: %d", code)
+	}
+	var empty graphJSON
+	if code := h.do(stranger, "GET", "/v1/graph", "", &empty); code != http.StatusOK || len(empty.Nodes) != 0 {
+		t.Fatalf("stranger graph: %d %+v", code, empty)
 	}
 }

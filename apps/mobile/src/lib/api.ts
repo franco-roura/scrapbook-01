@@ -1,3 +1,5 @@
+import type { GraphData } from '../graph/types';
+
 // Client for the Go API in /server. Kept free of React Native imports so it
 // can be unit-tested with `bun test`.
 
@@ -103,6 +105,13 @@ export function createApi({ baseUrl, getToken, fetch: f = fetch }: Options) {
 
     registerDevice: (token: string, platform: 'ios' | 'android') =>
       request<void>('PUT', `/v1/devices/${encodeURIComponent(token)}`, { platform }),
+
+    /** Every item, category hub and link, for the graph view. */
+    getGraph: () => request<GraphData>('GET', '/v1/graph'),
+
+    /** The local graph around one item, 1 or 2 hops out. */
+    getNeighbors: (id: string, depth: 1 | 2) =>
+      request<GraphData>('GET', `/v1/items/${encodeURIComponent(id)}/neighbors?depth=${depth}`),
 
     unregisterDevice: (token: string) => request<void>('DELETE', `/v1/devices/${encodeURIComponent(token)}`),
   };

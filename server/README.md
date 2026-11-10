@@ -1,6 +1,6 @@
 # Scrapbook/01 API (Go)
 
-The Go API behind Scrapbook/01. Signed-in users save shared links with an optional "What is it about?" description (Phase 1). A background job then files each described item into a category and links it to similar items (Phase 3). The graph view and MCP come in later phases.
+The Go API behind Scrapbook/01. Signed-in users save shared links with an optional "What is it about?" description (Phase 1). A background job then files each described item into a category and links it to similar items (Phase 3), which the app draws as a graph (Phase 4). MCP comes next.
 
 ## How items get a category
 
@@ -37,6 +37,8 @@ All `/v1` routes need a token. Users only ever see their own items.
 | `GET` | `/v1/items/{id}` | |
 | `PATCH` | `/v1/items/{id}` | `{"description": "..."}` (`null` moves it back to the inbox) and/or `{"categoryId": "..."}` (`null` for none). Picking a category stops automatic sorting for that item |
 | `DELETE` | `/v1/items/{id}` | |
+| `GET` | `/v1/graph` | Every item (newest 2000), category hub and link: `{nodes, links, truncated}`. Nodes are `item` or `category` (id `c:<uuid>`); links are `similar` (with a weight) or `category` |
+| `GET` | `/v1/items/{id}/neighbors` | The local graph around one item: `depth=1` (default) or `2` hops over `similar` links, at most 60 items, plus their category hubs. The item comes first |
 | `GET` | `/v1/categories` | Categories with item counts |
 | `POST` | `/v1/categories` | `{"name": "..."}`. Returns the existing category if the name is taken (ignoring case) |
 | `PUT` | `/v1/devices/{expoPushToken}` | `{"platform": "ios" \| "android"}`. Registers a phone for notifications |
@@ -61,6 +63,7 @@ TYPESAFE_API_KEY=dev TYPESAFE_BASE_URL=http://127.0.0.1:8787 EMBEDDINGS_API_KEY=
 - `db/migrations`: goose SQL migrations, embedded into the binary.
 - `db/queries`: SQL for sqlc. Generated Go code is in `internal/db` (don't edit it).
 - `internal/api`: handlers. `internal/auth`: token checks. `internal/links`: URL cleanup and platform detection.
+- `internal/graph`: builds graph and neighborhood responses.
 - `internal/classify`: the sorting pipeline. `internal/ai`: Jev, embeddings and Claude clients. `internal/jobs`: River setup. `internal/push`: Expo notifications.
 
 ## Regenerate queries

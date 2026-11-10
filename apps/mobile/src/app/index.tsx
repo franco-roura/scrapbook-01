@@ -51,9 +51,14 @@ function ItemList({ tab, setTab }: { tab: TabName; setTab: (t: TabName) => void 
         ListHeaderComponent={
           <View className="gap-4 pb-2 pt-2">
             <HudLabel code="L-01">Library</HudLabel>
-            <View className="flex-row gap-2 self-start rounded-full bg-shell-recess p-1" accessibilityRole="tablist">
-              <Tab label="All" active={tab === 'all'} onPress={() => setTab('all')} />
-              <Tab label="Undescribed" active={tab === 'inbox'} onPress={() => setTab('inbox')} />
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row gap-2 rounded-full bg-shell-recess p-1" accessibilityRole="tablist">
+                <Tab label="All" active={tab === 'all'} onPress={() => setTab('all')} />
+                <Tab label="Undescribed" active={tab === 'inbox'} onPress={() => setTab('inbox')} />
+              </View>
+              <Button variant="secondary" onPress={() => router.push('/graph')}>
+                Graph
+              </Button>
             </View>
             {list.error ? <Text variant="bodySm" className="text-danger">{list.error}</Text> : null}
           </View>
