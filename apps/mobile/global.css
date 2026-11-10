@@ -1,0 +1,78 @@
+@import 'tailwindcss';
+@import 'uniwind';
+
+/*
+ * Module/01 tokens for React Native, copied from
+ * @franco_roura/module-01/tokens.css (v1.0.1). The web package's theme.css
+ * can't be imported here: it pulls in tw-animate-css and web-only effects
+ * (shadows as box-shadow lists, clip-path notches). Colors are resolved to
+ * hex so they don't depend on var() chains.
+ */
+@theme {
+  --color-*: initial;
+
+  --color-graphite-50: #f3f4f6;
+  --color-graphite-100: #e7e9ec;
+  --color-graphite-300: #c9ccd2;
+  --color-graphite-400: #a3a7ae;
+  --color-graphite-500: #7c818a;
+  --color-graphite-700: #53575e;
+  --color-graphite-900: #1c1e21;
+
+  --color-canvas: #f3f4f6;
+  --color-shell: #ffffff;
+  --color-shell-recess: #e7e9ec;
+  --color-seam: #c9ccd2;
+  --color-ink: #1c1e21;
+  --color-ink-soft: #53575e;
+  --color-hud-mark: #7c818a;
+  --color-signal: #ff5f1f;
+  --color-signal-ink: #b93d0a;
+  --color-signal-shade: #d94a12;
+  --color-signal-tint: #ffd9c7;
+  --color-studio: #b9bccd;
+  --color-visor: #1c1e21;
+  --color-visor-mark: #a3a7ae;
+  --color-led-on: #1fa45a;
+  --color-danger: #b42318;
+  --color-danger-tint: #fde4e1;
+  --color-overlay: rgba(28, 30, 33, 0.36);
+  --color-transparent: transparent;
+
+  /* One family per weight: React Native can't pick a weight inside a
+     custom family. Loaded at runtime by useAppFonts(). */
+  --font-display: Michroma_400Regular;
+  --font-sans: Manrope_400Regular;
+  --font-sans-medium: Manrope_600SemiBold;
+  --font-sans-bold: Manrope_700Bold;
+  --font-mono: SpaceMono_400Regular;
+  --font-mono-bold: SpaceMono_700Bold;
+
+  --text-display-lg: 36px;
+  --text-display-lg--line-height: 41px;
+  --text-display-md: 24px;
+  --text-display-md--line-height: 30px;
+  --text-display-sm: 17px;
+  --text-display-sm--line-height: 23px;
+  --text-body-lg: 19px;
+  --text-body-lg--line-height: 29px;
+  --text-body-md: 16px;
+  --text-body-md--line-height: 25px;
+  --text-body-sm: 14px;
+  --text-body-sm--line-height: 21px;
+  --text-label: 14px;
+  --text-label--line-height: 17px;
+  --text-hud: 12px;
+  --text-hud--line-height: 16px;
+  --text-hud-sm: 10px;
+  --text-hud-sm--line-height: 12px;
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 24px;
+  --radius-xl: 36px;
+  --radius-full: 999px;
+
+  --spacing-control: 44px;
+}
