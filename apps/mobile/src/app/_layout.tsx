@@ -9,6 +9,8 @@ import { StatusBar } from 'expo-status-bar';
 
 import { AndroidShareListener } from '../share/AndroidShareListener';
 import { AuthProvider } from '../lib/auth';
+import { PushRegistrar } from '../lib/push';
+import { SignOutButton } from '../ui/SignOutButton';
 import { colors } from '../ui/module01';
 
 export default function RootLayout() {
@@ -26,6 +28,7 @@ export default function RootLayout() {
     <AuthProvider>
       <AndroidShareListener>
         <StatusBar style="dark" />
+        <PushRegistrar />
         <Stack
           screenOptions={{
             headerShadowVisible: false,
@@ -35,7 +38,13 @@ export default function RootLayout() {
             contentStyle: { backgroundColor: colors.canvas },
           }}
         >
-          <Stack.Screen name="index" options={{ title: 'Scrapbook/01' }} />
+          <Stack.Screen
+            name="index"
+            options={{
+              title: 'Scrapbook/01',
+              headerRight: () => <SignOutButton />,
+            }}
+          />
           <Stack.Screen name="sign-in" options={{ title: 'Sign in' }} />
           <Stack.Screen name="item/[id]" options={{ title: 'Item' }} />
           <Stack.Screen name="share" options={{ presentation: 'modal', headerShown: false }} />

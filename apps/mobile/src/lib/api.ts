@@ -9,6 +9,10 @@ export type Item = {
   platform: string;
   description: string | null;
   category: Category | null;
+  /** "auto" while Scrapbook/01 picks the category, "user" once you chose one. */
+  categorySource: 'auto' | 'user';
+  /** True while a new description is waiting for its category. */
+  classifying: boolean;
   previewTitle: string | null;
   previewImage: string | null;
   createdAt: string;
@@ -16,6 +20,8 @@ export type Item = {
 };
 
 export type ItemPage = { items: Item[]; nextCursor: string | null };
+
+export type CategorySummary = Category & { itemCount: number; createdAt: string };
 
 export class ApiError extends Error {
   constructor(
@@ -85,6 +91,20 @@ export function createApi({ baseUrl, getToken, fetch: f = fetch }: Options) {
       }),
 
     deleteItem: (id: string) => request<void>('DELETE', `/v1/items/${encodeURIComponent(id)}`),
+
+    /** Moves an item to a category you chose (null: no category). */
+    setItemCategory: (id: string, categoryId: string | null) =>
+      request<Item>('PATCH', `/v1/items/${encodeURIComponent(id)}`, { categoryId }),
+
+    listCategories: () => request<{ categories: CategorySummary[] }>('GET', '/v1/categories').then((r) => r.categories),
+
+    /** Creates a category, or returns the existing one with that name. */
+    createCategory: (name: string) => request<Category>('POST', '/v1/categories', { name: name.trim() }),
+
+    registerDevice: (token: string, platform: 'ios' | 'android') =>
+      request<void>('PUT', `/v1/devices/${encodeURIComponent(token)}`, { platform }),
+
+    unregisterDevice: (token: string) => request<void>('DELETE', `/v1/devices/${encodeURIComponent(token)}`),
   };
 }
 

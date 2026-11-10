@@ -31,6 +31,7 @@
       "expo-secure-store",
       "expo-font",
       "expo-web-browser",
+      "expo-notifications",
       [
         "expo-share-extension",
         {
@@ -44,7 +45,9 @@
             "expo-updates",
             "expo-font",
             "expo-router",
-            "expo-web-browser"
+            "expo-web-browser",
+            "expo-notifications",
+            "expo-device"
           ],
           "backgroundColor": { "red": 243, "green": 244, "blue": 246, "alpha": 1 },
           "height": 420

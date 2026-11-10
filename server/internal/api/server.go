@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/aaugoustis/waitlist/server/internal/auth"
 	"github.com/aaugoustis/waitlist/server/internal/db"
 )
@@ -17,11 +19,17 @@ import (
 const maxBody = 16 << 10
 
 type Server struct {
-	q      db.Querier
-	log    *slog.Logger
-	ping   func(context.Context) error
-	authMW func(http.Handler) http.Handler
-	cors   map[string]bool
+	q       db.Querier
+	log     *slog.Logger
+	ping    func(context.Context) error
+	authMW  func(http.Handler) http.Handler
+	cors    map[string]bool
+	enqueue Enqueuer
+}
+
+// Enqueuer queues background work. The jobs package implements it.
+type Enqueuer interface {
+	EnqueueClassify(ctx context.Context, itemID uuid.UUID) error
 }
 
 type Options struct {
@@ -33,10 +41,12 @@ type Options struct {
 	// CORSOrigins are browser origins allowed to call the API (the web
 	// build of the app). Native apps don't need CORS.
 	CORSOrigins []string
+	// Enqueuer queues classification after saves. Optional.
+	Enqueuer Enqueuer
 }
 
 func New(o Options) *Server {
-	s := &Server{q: o.Queries, log: o.Logger, ping: o.Ping, cors: map[string]bool{}}
+	s := &Server{q: o.Queries, log: o.Logger, ping: o.Ping, cors: map[string]bool{}, enqueue: o.Enqueuer}
 	for _, origin := range o.CORSOrigins {
 		s.cors[origin] = true
 	}
@@ -66,6 +76,9 @@ func (s *Server) routes(authMW func(http.Handler) http.Handler) http.Handler {
 	v1.HandleFunc("PATCH /v1/items/{id}", s.updateItem)
 	v1.HandleFunc("DELETE /v1/items/{id}", s.deleteItem)
 	v1.HandleFunc("GET /v1/categories", s.listCategories)
+	v1.HandleFunc("POST /v1/categories", s.createCategory)
+	v1.HandleFunc("PUT /v1/devices/{token}", s.registerDevice)
+	v1.HandleFunc("DELETE /v1/devices/{token}", s.unregisterDevice)
 	mux.Handle("/v1/", authMW(v1))
 
 	return s.recoverer(s.logRequests(s.withCORS(mux)))
@@ -85,7 +98,7 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 		h.Set("Access-Control-Allow-Origin", origin)
 		h.Add("Vary", "Origin")
 		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
-			h.Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE")
+			h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
 			h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 			h.Set("Access-Control-Max-Age", "600")
 			w.WriteHeader(http.StatusNoContent)

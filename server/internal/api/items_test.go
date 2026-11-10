@@ -22,18 +22,28 @@ import (
 )
 
 // fakeQueries is an in-memory db.Querier that mimics the SQL in db/queries.
+// The embedded interface is nil: calling a method the fake doesn't define
+// panics, which flags a handler using a query these tests don't expect.
 type fakeQueries struct {
-	mu    sync.Mutex
-	items map[uuid.UUID]db.GetItemRow
-	owner map[uuid.UUID]uuid.UUID
-	clock time.Time
+	db.Querier
+	mu         sync.Mutex
+	items      map[uuid.UUID]db.GetItemRow
+	owner      map[uuid.UUID]uuid.UUID
+	categories map[uuid.UUID]db.InsertCategoryRow
+	catOwner   map[uuid.UUID]uuid.UUID
+	feedback   []db.InsertCategoryFeedbackParams
+	devices    map[string]db.UpsertDeviceParams
+	clock      time.Time
 }
 
 func newFake() *fakeQueries {
 	return &fakeQueries{
-		items: map[uuid.UUID]db.GetItemRow{},
-		owner: map[uuid.UUID]uuid.UUID{},
-		clock: time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC),
+		items:      map[uuid.UUID]db.GetItemRow{},
+		owner:      map[uuid.UUID]uuid.UUID{},
+		categories: map[uuid.UUID]db.InsertCategoryRow{},
+		catOwner:   map[uuid.UUID]uuid.UUID{},
+		devices:    map[string]db.UpsertDeviceParams{},
+		clock:      time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC),
 	}
 }
 
@@ -44,19 +54,103 @@ func (f *fakeQueries) UpsertItem(_ context.Context, a db.UpsertItemParams) (db.U
 	defer f.mu.Unlock()
 	for id, it := range f.items {
 		if f.owner[id] == a.UserID && it.Url == a.Url {
+			changed := a.Description != nil && (it.Description == nil || *it.Description != *a.Description)
 			if a.Description != nil {
 				it.Description = a.Description
 			}
+			it.Classifying = it.Classifying || changed
 			it.UpdatedAt = f.tick()
 			f.items[id] = it
-			return db.UpsertItemRow{ID: id}, nil
+			return db.UpsertItemRow{ID: id, NeedsClassifying: it.Classifying}, nil
 		}
 	}
 	id := uuid.New()
 	now := f.tick()
-	f.items[id] = db.GetItemRow{ID: id, Url: a.Url, Platform: a.Platform, Description: a.Description, CreatedAt: now, UpdatedAt: now}
+	f.items[id] = db.GetItemRow{
+		ID: id, Url: a.Url, Platform: a.Platform, Description: a.Description, CreatedAt: now, UpdatedAt: now,
+		CategorySource: "auto", Classifying: a.Description != nil,
+	}
 	f.owner[id] = a.UserID
-	return db.UpsertItemRow{ID: id, Inserted: true}, nil
+	return db.UpsertItemRow{ID: id, Inserted: true, NeedsClassifying: a.Description != nil}, nil
+}
+
+func (f *fakeQueries) CategoryBelongsToUser(_ context.Context, a db.CategoryBelongsToUserParams) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.catOwner[a.ID] == a.UserID, nil
+}
+
+func (f *fakeQueries) InsertCategory(_ context.Context, a db.InsertCategoryParams) (db.InsertCategoryRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for id, c := range f.categories {
+		if f.catOwner[id] == a.UserID && strings.EqualFold(c.Name, a.Name) {
+			return c, nil
+		}
+	}
+	row := db.InsertCategoryRow{ID: uuid.New(), Name: a.Name}
+	f.categories[row.ID] = row
+	f.catOwner[row.ID] = a.UserID
+	return row, nil
+}
+
+func (f *fakeQueries) SetItemCategoryByUser(_ context.Context, a db.SetItemCategoryByUserParams) (db.SetItemCategoryByUserRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	it, ok := f.items[a.ID]
+	if !ok || f.owner[a.ID] != a.UserID {
+		return db.SetItemCategoryByUserRow{}, pgx.ErrNoRows
+	}
+	old := db.SetItemCategoryByUserRow{FromCategoryID: it.CategoryID, Description: it.Description}
+	it.CategoryID, it.CategoryName, it.CategorySource = a.CategoryID, nil, "user"
+	if a.CategoryID != nil {
+		name := f.categories[*a.CategoryID].Name
+		it.CategoryName = &name
+	}
+	f.items[a.ID] = it
+	return old, nil
+}
+
+func (f *fakeQueries) InsertCategoryFeedback(_ context.Context, a db.InsertCategoryFeedbackParams) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.feedback = append(f.feedback, a)
+	return nil
+}
+
+func (f *fakeQueries) UpsertDevice(_ context.Context, a db.UpsertDeviceParams) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.devices[a.Token] = a
+	return nil
+}
+
+func (f *fakeQueries) DeleteDevice(_ context.Context, a db.DeleteDeviceParams) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if d, ok := f.devices[a.Token]; ok && d.UserID == a.UserID {
+		delete(f.devices, a.Token)
+	}
+	return nil
+}
+
+// fakeEnqueuer records which items were queued for classification.
+type fakeEnqueuer struct {
+	mu  sync.Mutex
+	ids []uuid.UUID
+}
+
+func (e *fakeEnqueuer) EnqueueClassify(_ context.Context, id uuid.UUID) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.ids = append(e.ids, id)
+	return nil
+}
+
+func (e *fakeEnqueuer) count() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return len(e.ids)
 }
 
 func (f *fakeQueries) GetItem(_ context.Context, a db.GetItemParams) (db.GetItemRow, error) {
@@ -89,16 +183,19 @@ func (f *fakeQueries) ListItems(_ context.Context, a db.ListItemsParams) ([]db.L
 	return out, nil
 }
 
-func (f *fakeQueries) SetItemDescription(_ context.Context, a db.SetItemDescriptionParams) (int64, error) {
+func (f *fakeQueries) SetItemDescription(_ context.Context, a db.SetItemDescriptionParams) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	it, ok := f.items[a.ID]
 	if !ok || f.owner[a.ID] != a.UserID {
-		return 0, nil
+		return false, pgx.ErrNoRows
 	}
+	changed := (a.Description == nil) != (it.Description == nil) ||
+		(a.Description != nil && *a.Description != *it.Description)
 	it.Description = a.Description
+	it.Classifying = a.Description != nil && (it.Classifying || changed)
 	f.items[a.ID] = it
-	return 1, nil
+	return it.Classifying, nil
 }
 
 func (f *fakeQueries) DeleteItem(_ context.Context, a db.DeleteItemParams) (int64, error) {
@@ -122,18 +219,22 @@ var testSecret = []byte("test-secret-at-least-32-bytes-long!!")
 type harness struct {
 	t   *testing.T
 	srv *httptest.Server
+	q   *fakeQueries
+	enq *fakeEnqueuer
 }
 
 func newHarness(t *testing.T) *harness {
+	q, enq := newFake(), &fakeEnqueuer{}
 	s := New(Options{
-		Queries:     newFake(),
+		Queries:     q,
 		Logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Verifier:    auth.NewHS256(testSecret, testIssuer),
 		CORSOrigins: []string{"http://localhost:8081"},
+		Enqueuer:    enq,
 	})
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
-	return &harness{t: t, srv: srv}
+	return &harness{t: t, srv: srv, q: q, enq: enq}
 }
 
 func token(t *testing.T, user uuid.UUID) string {
@@ -244,6 +345,7 @@ func TestValidation(t *testing.T) {
 		{"POST", "/v1/items", `{`, http.StatusBadRequest},
 		{"POST", "/v1/items", `{"url":"https://x.com/a","description":"` + strings.Repeat("a", maxBody) + `"}`, http.StatusRequestEntityTooLarge},
 		{"PATCH", "/v1/items/" + uuid.NewString(), `{}`, http.StatusBadRequest},
+		{"PATCH", "/v1/items/" + uuid.NewString(), `{"description":"x","other":1}`, http.StatusBadRequest},
 		{"PATCH", "/v1/items/" + uuid.NewString(), `{"description":5}`, http.StatusBadRequest},
 		{"PATCH", "/v1/items/" + uuid.NewString(), `{"description":"x"}`, http.StatusNotFound},
 		{"GET", "/v1/items/not-a-uuid", ``, http.StatusNotFound},
@@ -305,5 +407,91 @@ func TestCORS(t *testing.T) {
 	}
 	if bad := preflight("https://evil.example"); bad.Header.Get("Access-Control-Allow-Origin") != "" {
 		t.Fatalf("unknown origin got CORS headers: %v", bad.Header)
+	}
+}
+
+func TestClassificationIsQueuedOnlyForNewDescriptions(t *testing.T) {
+	h := newHarness(t)
+	user := uuid.New()
+
+	var it itemJSON
+	h.do(user, "POST", "/v1/items", `{"url":"https://x.com/a/status/1"}`, &it)
+	if h.enq.count() != 0 || it.Classifying {
+		t.Fatalf("save without description queued %d jobs (classifying=%v)", h.enq.count(), it.Classifying)
+	}
+	h.do(user, "PATCH", "/v1/items/"+it.ID.String(), `{"description":"pricing thread"}`, &it)
+	if h.enq.count() != 1 || !it.Classifying || it.CategorySource != "auto" {
+		t.Fatalf("describe: %d jobs, item %+v", h.enq.count(), it)
+	}
+	// Saving the same link with the same description again costs nothing.
+	h.do(user, "POST", "/v1/items", `{"url":"https://x.com/a/status/1","description":"pricing thread"}`, nil)
+	if h.enq.count() != 2 {
+		// The fake still reports classifying=true (no worker ran), so a second
+		// enqueue is expected here; River's unique jobs collapse it.
+		t.Fatalf("re-save: %d jobs", h.enq.count())
+	}
+}
+
+func TestUserCategoryCorrection(t *testing.T) {
+	h := newHarness(t)
+	user, stranger := uuid.New(), uuid.New()
+
+	var it itemJSON
+	h.do(user, "POST", "/v1/items", `{"url":"https://example.com/r","description":"lemon pasta"}`, &it)
+
+	var cat categoryJSON
+	if code := h.do(user, "POST", "/v1/categories", `{"name":"  Recipes  "}`, &cat); code != http.StatusCreated || cat.Name != "Recipes" {
+		t.Fatalf("create category: %d %+v", code, cat)
+	}
+	var other categoryJSON
+	h.do(stranger, "POST", "/v1/categories", `{"name":"Theirs"}`, &other)
+
+	if code := h.do(user, "PATCH", "/v1/items/"+it.ID.String(), `{"categoryId":"`+other.ID.String()+`"}`, nil); code != http.StatusUnprocessableEntity {
+		t.Fatalf("someone else's category: status %d", code)
+	}
+	if code := h.do(user, "PATCH", "/v1/items/"+it.ID.String(), `{"categoryId":"`+cat.ID.String()+`"}`, &it); code != http.StatusOK {
+		t.Fatalf("set category: status %d", code)
+	}
+	if it.Category == nil || it.Category.ID != cat.ID || it.CategorySource != "user" {
+		t.Fatalf("item after correction: %+v", it)
+	}
+	if len(h.q.feedback) != 1 || h.q.feedback[0].Description != "lemon pasta" || *h.q.feedback[0].ToCategoryID != cat.ID {
+		t.Fatalf("feedback: %+v", h.q.feedback)
+	}
+	// Clearing works too, and records another correction.
+	h.do(user, "PATCH", "/v1/items/"+it.ID.String(), `{"categoryId":null}`, &it)
+	if it.Category != nil || len(h.q.feedback) != 2 {
+		t.Fatalf("clear: item %+v, feedback %d", it, len(h.q.feedback))
+	}
+	if code := h.do(user, "PATCH", "/v1/items/"+it.ID.String(), `{"categoryId":"nope"}`, nil); code != http.StatusBadRequest {
+		t.Fatalf("bad uuid: status %d", code)
+	}
+	if code := h.do(user, "POST", "/v1/categories", `{"name":"   "}`, nil); code != http.StatusUnprocessableEntity {
+		t.Fatalf("blank name: status %d", code)
+	}
+}
+
+func TestDevices(t *testing.T) {
+	h := newHarness(t)
+	user := uuid.New()
+	tok := "ExponentPushToken[abc123]"
+	if code := h.do(user, "PUT", "/v1/devices/"+tok, `{"platform":"ios"}`, nil); code != http.StatusNoContent {
+		t.Fatalf("register: status %d", code)
+	}
+	if d := h.q.devices[tok]; d.UserID != user || d.Platform != "ios" {
+		t.Fatalf("stored device: %+v", d)
+	}
+	if code := h.do(user, "PUT", "/v1/devices/not-a-token", `{"platform":"ios"}`, nil); code != http.StatusUnprocessableEntity {
+		t.Fatalf("bad token: status %d", code)
+	}
+	if code := h.do(user, "PUT", "/v1/devices/"+tok, `{"platform":"windows"}`, nil); code != http.StatusUnprocessableEntity {
+		t.Fatalf("bad platform: status %d", code)
+	}
+	if code := h.do(uuid.New(), "DELETE", "/v1/devices/"+tok, ``, nil); code != http.StatusNoContent || len(h.q.devices) != 1 {
+		t.Fatalf("stranger delete removed the device")
+	}
+	h.do(user, "DELETE", "/v1/devices/"+tok, ``, nil)
+	if len(h.q.devices) != 0 {
+		t.Fatalf("delete kept the device")
 	}
 }

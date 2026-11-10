@@ -31,7 +31,8 @@ func (q *Queries) DeleteItem(ctx context.Context, arg DeleteItemParams) (int64, 
 
 const getItem = `-- name: GetItem :one
 SELECT i.id, i.url, i.platform, i.description, i.preview_title, i.preview_image,
-       i.created_at, i.updated_at, i.category_id, c.name AS category_name
+       i.created_at, i.updated_at, i.category_id, c.name AS category_name, i.category_source,
+       (i.description IS NOT NULL AND i.classified_at IS DISTINCT FROM i.described_at)::bool AS classifying
 FROM items i
 LEFT JOIN categories c ON c.id = i.category_id
 WHERE i.id = $1 AND i.user_id = $2
@@ -43,16 +44,18 @@ type GetItemParams struct {
 }
 
 type GetItemRow struct {
-	ID           uuid.UUID
-	Url          string
-	Platform     string
-	Description  *string
-	PreviewTitle *string
-	PreviewImage *string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	CategoryID   *uuid.UUID
-	CategoryName *string
+	ID             uuid.UUID
+	Url            string
+	Platform       string
+	Description    *string
+	PreviewTitle   *string
+	PreviewImage   *string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	CategoryID     *uuid.UUID
+	CategoryName   *string
+	CategorySource string
+	Classifying    bool
 }
 
 func (q *Queries) GetItem(ctx context.Context, arg GetItemParams) (GetItemRow, error) {
@@ -69,42 +72,49 @@ func (q *Queries) GetItem(ctx context.Context, arg GetItemParams) (GetItemRow, e
 		&i.UpdatedAt,
 		&i.CategoryID,
 		&i.CategoryName,
+		&i.CategorySource,
+		&i.Classifying,
 	)
 	return i, err
 }
 
 const listItems = `-- name: ListItems :many
 SELECT i.id, i.url, i.platform, i.description, i.preview_title, i.preview_image,
-       i.created_at, i.updated_at, i.category_id, c.name AS category_name
+       i.created_at, i.updated_at, i.category_id, c.name AS category_name, i.category_source,
+       (i.description IS NOT NULL AND i.classified_at IS DISTINCT FROM i.described_at)::bool AS classifying
 FROM items i
 LEFT JOIN categories c ON c.id = i.category_id
 WHERE i.user_id = $1
   AND (NOT $2::bool OR i.description IS NULL)
-  AND ($3::timestamptz IS NULL
-       OR (i.created_at, i.id) < ($3::timestamptz, $4::uuid))
+  AND ($3::uuid IS NULL OR i.category_id = $3::uuid)
+  AND ($4::timestamptz IS NULL
+       OR (i.created_at, i.id) < ($4::timestamptz, $5::uuid))
 ORDER BY i.created_at DESC, i.id DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListItemsParams struct {
 	UserID          uuid.UUID
 	OnlyUndescribed bool
+	CategoryID      *uuid.UUID
 	BeforeCreated   *time.Time
 	BeforeID        *uuid.UUID
 	Lim             int32
 }
 
 type ListItemsRow struct {
-	ID           uuid.UUID
-	Url          string
-	Platform     string
-	Description  *string
-	PreviewTitle *string
-	PreviewImage *string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	CategoryID   *uuid.UUID
-	CategoryName *string
+	ID             uuid.UUID
+	Url            string
+	Platform       string
+	Description    *string
+	PreviewTitle   *string
+	PreviewImage   *string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	CategoryID     *uuid.UUID
+	CategoryName   *string
+	CategorySource string
+	Classifying    bool
 }
 
 // Newest first, paged with a (created_at, id) cursor.
@@ -112,6 +122,7 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListIte
 	rows, err := q.db.Query(ctx, listItems,
 		arg.UserID,
 		arg.OnlyUndescribed,
+		arg.CategoryID,
 		arg.BeforeCreated,
 		arg.BeforeID,
 		arg.Lim,
@@ -134,6 +145,8 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListIte
 			&i.UpdatedAt,
 			&i.CategoryID,
 			&i.CategoryName,
+			&i.CategorySource,
+			&i.Classifying,
 		); err != nil {
 			return nil, err
 		}
@@ -145,10 +158,49 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListIte
 	return items, nil
 }
 
-const setItemDescription = `-- name: SetItemDescription :execrows
+const setItemCategoryByUser = `-- name: SetItemCategoryByUser :one
+WITH old AS (
+    SELECT category_id, description FROM items
+    WHERE id = $2 AND user_id = $3
+    FOR UPDATE
+)
+UPDATE items i
+SET category_id = $1, category_source = 'user', updated_at = now()
+FROM old
+WHERE i.id = $2 AND i.user_id = $3
+RETURNING old.category_id AS from_category_id, old.description
+`
+
+type SetItemCategoryByUserParams struct {
+	CategoryID *uuid.UUID
+	ID         uuid.UUID
+	UserID     uuid.UUID
+}
+
+type SetItemCategoryByUserRow struct {
+	FromCategoryID *uuid.UUID
+	Description    *string
+}
+
+// The user picked a category: the classifier won't change it again.
+func (q *Queries) SetItemCategoryByUser(ctx context.Context, arg SetItemCategoryByUserParams) (SetItemCategoryByUserRow, error) {
+	row := q.db.QueryRow(ctx, setItemCategoryByUser, arg.CategoryID, arg.ID, arg.UserID)
+	var i SetItemCategoryByUserRow
+	err := row.Scan(&i.FromCategoryID, &i.Description)
+	return i, err
+}
+
+const setItemDescription = `-- name: SetItemDescription :one
 UPDATE items
-SET description = $1, updated_at = now()
+SET description  = $1,
+    described_at = CASE
+        WHEN $1::text IS NOT DISTINCT FROM description THEN described_at
+        WHEN $1::text IS NULL THEN NULL
+        ELSE now()
+    END,
+    updated_at   = now()
 WHERE id = $2 AND user_id = $3
+RETURNING (description IS NOT NULL AND classified_at IS DISTINCT FROM described_at)::bool AS needs_classifying
 `
 
 type SetItemDescriptionParams struct {
@@ -157,21 +209,27 @@ type SetItemDescriptionParams struct {
 	UserID      uuid.UUID
 }
 
-func (q *Queries) SetItemDescription(ctx context.Context, arg SetItemDescriptionParams) (int64, error) {
-	result, err := q.db.Exec(ctx, setItemDescription, arg.Description, arg.ID, arg.UserID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+func (q *Queries) SetItemDescription(ctx context.Context, arg SetItemDescriptionParams) (bool, error) {
+	row := q.db.QueryRow(ctx, setItemDescription, arg.Description, arg.ID, arg.UserID)
+	var needs_classifying bool
+	err := row.Scan(&needs_classifying)
+	return needs_classifying, err
 }
 
 const upsertItem = `-- name: UpsertItem :one
-INSERT INTO items (user_id, url, platform, description)
-VALUES ($1, $2, $3, $4)
+INSERT INTO items (user_id, url, platform, description, described_at)
+VALUES ($1, $2, $3, $4,
+        CASE WHEN $4::text IS NULL THEN NULL ELSE now() END)
 ON CONFLICT (user_id, url) DO UPDATE
-SET description = COALESCE(EXCLUDED.description, items.description),
-    updated_at  = now()
-RETURNING id, (xmax = 0)::bool AS inserted
+SET description  = COALESCE(EXCLUDED.description, items.description),
+    described_at = CASE
+        WHEN EXCLUDED.description IS NOT NULL AND EXCLUDED.description IS DISTINCT FROM items.description
+            THEN now()
+        ELSE items.described_at
+    END,
+    updated_at   = now()
+RETURNING id, (xmax = 0)::bool AS inserted,
+          (description IS NOT NULL AND classified_at IS DISTINCT FROM described_at)::bool AS needs_classifying
 `
 
 type UpsertItemParams struct {
@@ -182,12 +240,14 @@ type UpsertItemParams struct {
 }
 
 type UpsertItemRow struct {
-	ID       uuid.UUID
-	Inserted bool
+	ID               uuid.UUID
+	Inserted         bool
+	NeedsClassifying bool
 }
 
 // Saving the same link again keeps one row. A new description replaces the
 // old one; saving again without a description keeps what was there.
+// described_at only moves when the description text actually changes.
 func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) (UpsertItemRow, error) {
 	row := q.db.QueryRow(ctx, upsertItem,
 		arg.UserID,
@@ -196,6 +256,6 @@ func (q *Queries) UpsertItem(ctx context.Context, arg UpsertItemParams) (UpsertI
 		arg.Description,
 	)
 	var i UpsertItemRow
-	err := row.Scan(&i.ID, &i.Inserted)
+	err := row.Scan(&i.ID, &i.Inserted, &i.NeedsClassifying)
 	return i, err
 }

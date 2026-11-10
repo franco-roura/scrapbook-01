@@ -4,7 +4,9 @@ Phase 2 of the app plan: the React Native app and the "What is it about?" share 
 
 - **iOS:** sharing to Scrapbook/01 opens a small sheet on top of the other app (`expo-share-extension`, entry `index.share.js`). The sheet is signed in because the Supabase session is kept in the keychain under the app group `group.com.scrapbook01.app`, which the app and the extension share.
 - **Android:** sharing opens the app on the same sheet (`expo-share-intent`, `src/share/AndroidShareListener.tsx` → `src/app/share.tsx`).
-- **In the app:** library (newest first), the "Undescribed" inbox, item screen (describe, open, delete), "Add link", and email-code sign-in.
+- **In the app:** library (newest first), the "Undescribed" inbox, item screen (describe, open, delete, change category), "Add link", email-code sign-in and sign-out.
+- **Categories (Phase 3):** the server sorts each described item. Rows show "Sorting…" until it's done, and the item screen lets you move it (which stops automatic sorting for that item).
+- **Notifications:** after sign-in the app registers its Expo push token, and the server sends "Saved to *category*". Tapping it opens the item. This needs an EAS project id (`bun x eas-cli init`) and a development build.
 
 The UI follows Module/01. Its web components can't run in React Native, so `src/ui/module01.tsx` rebuilds the few parts used here (Panel with a notched corner, HudLabel, Chip, stadium Button, sunken Field), and `global.css` copies its tokens for Uniwind (Tailwind v4 for React Native).
 

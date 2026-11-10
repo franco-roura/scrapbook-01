@@ -12,6 +12,73 @@ import (
 	"github.com/google/uuid"
 )
 
+const categoryBelongsToUser = `-- name: CategoryBelongsToUser :one
+SELECT EXISTS (SELECT 1 FROM categories WHERE id = $1 AND user_id = $2)::bool
+`
+
+type CategoryBelongsToUserParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) CategoryBelongsToUser(ctx context.Context, arg CategoryBelongsToUserParams) (bool, error) {
+	row := q.db.QueryRow(ctx, categoryBelongsToUser, arg.ID, arg.UserID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const insertCategory = `-- name: InsertCategory :one
+INSERT INTO categories (user_id, name, name_embedding)
+VALUES ($1, $2, CAST($3::text AS vector))
+ON CONFLICT (user_id, lower(name)) DO UPDATE
+SET name_embedding = COALESCE(categories.name_embedding, EXCLUDED.name_embedding)
+RETURNING id, name
+`
+
+type InsertCategoryParams struct {
+	UserID        uuid.UUID
+	Name          string
+	NameEmbedding *string
+}
+
+type InsertCategoryRow struct {
+	ID   uuid.UUID
+	Name string
+}
+
+// Creating a name that exists (ignoring case) returns the existing category.
+func (q *Queries) InsertCategory(ctx context.Context, arg InsertCategoryParams) (InsertCategoryRow, error) {
+	row := q.db.QueryRow(ctx, insertCategory, arg.UserID, arg.Name, arg.NameEmbedding)
+	var i InsertCategoryRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
+const insertCategoryFeedback = `-- name: InsertCategoryFeedback :exec
+INSERT INTO category_feedback (user_id, item_id, from_category_id, to_category_id, description)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type InsertCategoryFeedbackParams struct {
+	UserID         uuid.UUID
+	ItemID         uuid.UUID
+	FromCategoryID *uuid.UUID
+	ToCategoryID   *uuid.UUID
+	Description    string
+}
+
+func (q *Queries) InsertCategoryFeedback(ctx context.Context, arg InsertCategoryFeedbackParams) error {
+	_, err := q.db.Exec(ctx, insertCategoryFeedback,
+		arg.UserID,
+		arg.ItemID,
+		arg.FromCategoryID,
+		arg.ToCategoryID,
+		arg.Description,
+	)
+	return err
+}
+
 const listCategories = `-- name: ListCategories :many
 SELECT c.id, c.name, c.created_at, count(i.id)::int AS item_count
 FROM categories c

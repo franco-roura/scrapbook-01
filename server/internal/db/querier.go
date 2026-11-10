@@ -11,14 +11,44 @@ import (
 )
 
 type Querier interface {
+	// Only while the classifier owns the category and the description hasn't
+	// changed since this job read it.
+	AssignAutoCategory(ctx context.Context, arg AssignAutoCategoryParams) (int64, error)
+	CategoryBelongsToUser(ctx context.Context, arg CategoryBelongsToUserParams) (bool, error)
+	DeleteDevice(ctx context.Context, arg DeleteDeviceParams) error
+	// Tokens Expo reports as no longer registered.
+	DeleteDeviceTokens(ctx context.Context, tokens []string) error
+	DeleteEdgesForItem(ctx context.Context, itemID uuid.UUID) error
 	DeleteItem(ctx context.Context, arg DeleteItemParams) (int64, error)
+	// The user's category whose name is closest in meaning to a proposed name.
+	FindSimilarCategory(ctx context.Context, arg FindSimilarCategoryParams) (FindSimilarCategoryRow, error)
 	GetItem(ctx context.Context, arg GetItemParams) (GetItemRow, error)
+	GetItemForClassify(ctx context.Context, id uuid.UUID) (GetItemForClassifyRow, error)
+	// Creating a name that exists (ignoring case) returns the existing category.
+	InsertCategory(ctx context.Context, arg InsertCategoryParams) (InsertCategoryRow, error)
+	InsertCategoryFeedback(ctx context.Context, arg InsertCategoryFeedbackParams) error
+	// Links an item to its nearest neighbours by embedding (cosine), keeping
+	// only reasonably similar ones. Each pair is stored once with src < dst.
+	InsertSimilarEdges(ctx context.Context, arg InsertSimilarEdgesParams) error
+	ItemsNeedingClassification(ctx context.Context, lim int32) ([]uuid.UUID, error)
 	ListCategories(ctx context.Context, userID uuid.UUID) ([]ListCategoriesRow, error)
+	// Each category with up to three recent item descriptions, which tell Jev
+	// what the user actually files there.
+	ListCategoriesForClassify(ctx context.Context, userID uuid.UUID) ([]ListCategoriesForClassifyRow, error)
+	ListDeviceTokens(ctx context.Context, userID uuid.UUID) ([]string, error)
+	ListEdgesForUser(ctx context.Context, userID uuid.UUID) ([]ListEdgesForUserRow, error)
 	// Newest first, paged with a (created_at, id) cursor.
 	ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error)
-	SetItemDescription(ctx context.Context, arg SetItemDescriptionParams) (int64, error)
+	MarkClassified(ctx context.Context, arg MarkClassifiedParams) (int64, error)
+	// The user picked a category: the classifier won't change it again.
+	SetItemCategoryByUser(ctx context.Context, arg SetItemCategoryByUserParams) (SetItemCategoryByUserRow, error)
+	SetItemDescription(ctx context.Context, arg SetItemDescriptionParams) (bool, error)
+	SetItemEmbedding(ctx context.Context, arg SetItemEmbeddingParams) error
+	// A token moves to whoever signed in on that phone last.
+	UpsertDevice(ctx context.Context, arg UpsertDeviceParams) error
 	// Saving the same link again keeps one row. A new description replaces the
 	// old one; saving again without a description keeps what was there.
+	// described_at only moves when the description text actually changes.
 	UpsertItem(ctx context.Context, arg UpsertItemParams) (UpsertItemRow, error)
 }
 

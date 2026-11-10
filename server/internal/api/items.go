@@ -30,15 +30,20 @@ type categoryJSON struct {
 }
 
 type itemJSON struct {
-	ID           uuid.UUID     `json:"id"`
-	URL          string        `json:"url"`
-	Platform     string        `json:"platform"`
-	Description  *string       `json:"description"`
-	Category     *categoryJSON `json:"category"`
-	PreviewTitle *string       `json:"previewTitle"`
-	PreviewImage *string       `json:"previewImage"`
-	CreatedAt    time.Time     `json:"createdAt"`
-	UpdatedAt    time.Time     `json:"updatedAt"`
+	ID          uuid.UUID     `json:"id"`
+	URL         string        `json:"url"`
+	Platform    string        `json:"platform"`
+	Description *string       `json:"description"`
+	Category    *categoryJSON `json:"category"`
+	// CategorySource is "auto" while the classifier picks the category and
+	// "user" once the user chose one.
+	CategorySource string `json:"categorySource"`
+	// Classifying is true while a new description waits for a category.
+	Classifying  bool      `json:"classifying"`
+	PreviewTitle *string   `json:"previewTitle"`
+	PreviewImage *string   `json:"previewImage"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 // GetItemRow and ListItemsRow have the same columns.
@@ -47,6 +52,7 @@ func toItemJSON(r db.GetItemRow) itemJSON {
 		ID: r.ID, URL: r.Url, Platform: r.Platform, Description: r.Description,
 		PreviewTitle: r.PreviewTitle, PreviewImage: r.PreviewImage,
 		CreatedAt: r.CreatedAt.UTC(), UpdatedAt: r.UpdatedAt.UTC(),
+		CategorySource: r.CategorySource, Classifying: r.Classifying,
 	}
 	if r.CategoryID != nil && r.CategoryName != nil {
 		it.Category = &categoryJSON{ID: *r.CategoryID, Name: *r.CategoryName}
@@ -104,6 +110,9 @@ func (s *Server) createItem(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, r, "upsert item", err)
 		return
 	}
+	if row.NeedsClassifying {
+		s.enqueueClassify(r, row.ID)
+	}
 	item, err := s.q.GetItem(r.Context(), db.GetItemParams{ID: row.ID, UserID: user})
 	if err != nil {
 		s.internal(w, r, "get saved item", err)
@@ -143,6 +152,14 @@ func (s *Server) listItems(w http.ResponseWriter, r *http.Request) {
 	if f := q.Get("filter"); f != "" && f != "undescribed" {
 		writeError(w, http.StatusBadRequest, "bad_filter", `filter must be "undescribed" or omitted.`)
 		return
+	}
+	if c := q.Get("categoryId"); c != "" {
+		id, err := uuid.Parse(c)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "bad_category", "Invalid categoryId.")
+			return
+		}
+		params.CategoryID = &id
 	}
 	if c := q.Get("cursor"); c != "" {
 		ts, id, err := decodeCursor(c)
@@ -195,43 +212,112 @@ func (s *Server) updateItem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// Only description is editable for now. A raw message tells "missing"
-	// apart from an explicit null (which clears it).
+	// Editable: "description" (null moves it back to the inbox) and
+	// "categoryId" (null means "no category"). Raw messages tell a missing
+	// field apart from an explicit null.
 	var req map[string]json.RawMessage
 	if !decode(w, r, &req) {
 		return
 	}
-	raw, present := req["description"]
-	if !present || len(req) != 1 {
-		writeError(w, http.StatusBadRequest, "bad_fields", `Send exactly one field: "description".`)
-		return
-	}
-	var d *string
-	if err := json.Unmarshal(raw, &d); err != nil {
-		writeError(w, http.StatusBadRequest, "bad_json", "description must be a string or null.")
-		return
-	}
-	desc, ok := cleanDescription(d)
-	if !ok {
-		writeError(w, http.StatusUnprocessableEntity, "description_too_long", "Keep the description under 2000 characters.")
+	rawDesc, hasDesc := req["description"]
+	rawCat, hasCat := req["categoryId"]
+	if len(req) == 0 || len(req) != btoi(hasDesc)+btoi(hasCat) {
+		writeError(w, http.StatusBadRequest, "bad_fields", `Send "description" and/or "categoryId".`)
 		return
 	}
 
-	n, err := s.q.SetItemDescription(r.Context(), db.SetItemDescriptionParams{Description: desc, ID: id, UserID: user})
-	if err != nil {
-		s.internal(w, r, "update item", err)
-		return
+	// Validate everything before changing anything.
+	var desc *string
+	if hasDesc {
+		var d *string
+		if err := json.Unmarshal(rawDesc, &d); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_json", "description must be a string or null.")
+			return
+		}
+		var ok bool
+		if desc, ok = cleanDescription(d); !ok {
+			writeError(w, http.StatusUnprocessableEntity, "description_too_long", "Keep the description under 2000 characters.")
+			return
+		}
 	}
-	if n == 0 {
+	var catID *uuid.UUID
+	if hasCat {
+		if err := json.Unmarshal(rawCat, &catID); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_json", "categoryId must be a UUID or null.")
+			return
+		}
+		if catID != nil {
+			owned, err := s.q.CategoryBelongsToUser(r.Context(), db.CategoryBelongsToUserParams{ID: *catID, UserID: user})
+			if err != nil {
+				s.internal(w, r, "check category", err)
+				return
+			}
+			if !owned {
+				writeError(w, http.StatusUnprocessableEntity, "unknown_category", "That category doesn't exist.")
+				return
+			}
+		}
+	}
+
+	if hasDesc {
+		needs, err := s.q.SetItemDescription(r.Context(), db.SetItemDescriptionParams{Description: desc, ID: id, UserID: user})
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "not_found", "Item not found.")
+			return
+		}
+		if err != nil {
+			s.internal(w, r, "update description", err)
+			return
+		}
+		if needs {
+			s.enqueueClassify(r, id)
+		}
+	}
+
+	if hasCat {
+		old, err := s.q.SetItemCategoryByUser(r.Context(), db.SetItemCategoryByUserParams{CategoryID: catID, ID: id, UserID: user})
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "not_found", "Item not found.")
+			return
+		}
+		if err != nil {
+			s.internal(w, r, "set category", err)
+			return
+		}
+		// A correction is a labeled example for tuning the classifier.
+		if old.Description != nil && !sameUUID(old.FromCategoryID, catID) {
+			if err := s.q.InsertCategoryFeedback(r.Context(), db.InsertCategoryFeedbackParams{
+				UserID: user, ItemID: id, FromCategoryID: old.FromCategoryID, ToCategoryID: catID, Description: *old.Description,
+			}); err != nil {
+				s.log.ErrorContext(r.Context(), "record category feedback", "err", err)
+			}
+		}
+	}
+
+	item, err := s.q.GetItem(r.Context(), db.GetItemParams{ID: id, UserID: user})
+	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "not_found", "Item not found.")
 		return
 	}
-	item, err := s.q.GetItem(r.Context(), db.GetItemParams{ID: id, UserID: user})
 	if err != nil {
 		s.internal(w, r, "get updated item", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toItemJSON(item))
+}
+
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func sameUUID(a, b *uuid.UUID) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 func (s *Server) deleteItem(w http.ResponseWriter, r *http.Request) {
@@ -271,6 +357,43 @@ func (s *Server) listCategories(w http.ResponseWriter, r *http.Request) {
 		out = append(out, categoryListJSON{ID: c.ID, Name: c.Name, ItemCount: c.ItemCount, CreatedAt: c.CreatedAt.UTC()})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"categories": out})
+}
+
+type createCategoryRequest struct {
+	Name string `json:"name"`
+}
+
+// createCategory lets the user make a category to move an item into.
+func (s *Server) createCategory(w http.ResponseWriter, r *http.Request) {
+	user, _ := auth.UserFrom(r.Context())
+	var req createCategoryRequest
+	if !decode(w, r, &req) {
+		return
+	}
+	name := strings.Join(strings.Fields(req.Name), " ")
+	if n := utf8.RuneCountInString(name); n < 1 || n > 60 {
+		writeError(w, http.StatusUnprocessableEntity, "bad_name", "Category names are 1 to 60 characters.")
+		return
+	}
+	// No name embedding yet, so the duplicate-name check skips this one;
+	// Jev still matches against it by name.
+	row, err := s.q.InsertCategory(r.Context(), db.InsertCategoryParams{UserID: user, Name: name})
+	if err != nil {
+		s.internal(w, r, "create category", err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, categoryJSON{ID: row.ID, Name: row.Name})
+}
+
+// enqueueClassify queues classification. A failure is logged, not returned:
+// the save already succeeded and the periodic sweep picks the item up.
+func (s *Server) enqueueClassify(r *http.Request, id uuid.UUID) {
+	if s.enqueue == nil {
+		return
+	}
+	if err := s.enqueue.EnqueueClassify(r.Context(), id); err != nil {
+		s.log.ErrorContext(r.Context(), "enqueue classify", "item", id, "err", err)
+	}
 }
 
 func pathID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {

@@ -8,24 +8,55 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pgvector/pgvector-go"
 )
 
 type Category struct {
-	ID        uuid.UUID
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	Name          string
+	CreatedAt     time.Time
+	NameEmbedding *pgvector.Vector
+}
+
+type CategoryFeedback struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	ItemID         uuid.UUID
+	FromCategoryID *uuid.UUID
+	ToCategoryID   *uuid.UUID
+	Description    string
+	CreatedAt      time.Time
+}
+
+type Device struct {
+	Token     string
 	UserID    uuid.UUID
-	Name      string
-	CreatedAt time.Time
+	Platform  string
+	UpdatedAt time.Time
+}
+
+type Edge struct {
+	Src    uuid.UUID
+	Dst    uuid.UUID
+	UserID uuid.UUID
+	Kind   string
+	Weight float32
 }
 
 type Item struct {
-	ID           uuid.UUID
-	UserID       uuid.UUID
-	Url          string
-	Platform     string
-	Description  *string
-	CategoryID   *uuid.UUID
-	PreviewTitle *string
-	PreviewImage *string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	Url            string
+	Platform       string
+	Description    *string
+	CategoryID     *uuid.UUID
+	PreviewTitle   *string
+	PreviewImage   *string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	Embedding      *pgvector.Vector
+	CategorySource string
+	DescribedAt    *time.Time
+	ClassifiedAt   *time.Time
 }

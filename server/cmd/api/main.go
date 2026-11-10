@@ -17,10 +17,14 @@ import (
 	"github.com/pressly/goose/v3"
 
 	"github.com/aaugoustis/waitlist/server/db/migrations"
+	"github.com/aaugoustis/waitlist/server/internal/ai"
 	"github.com/aaugoustis/waitlist/server/internal/api"
 	"github.com/aaugoustis/waitlist/server/internal/auth"
+	"github.com/aaugoustis/waitlist/server/internal/classify"
 	"github.com/aaugoustis/waitlist/server/internal/config"
 	"github.com/aaugoustis/waitlist/server/internal/db"
+	"github.com/aaugoustis/waitlist/server/internal/jobs"
+	"github.com/aaugoustis/waitlist/server/internal/push"
 )
 
 func main() {
@@ -63,14 +67,35 @@ func run(log *slog.Logger) error {
 		log.Info("auth: using JWKS", "url", cfg.JWKSURL())
 	}
 
+	queries := db.New(pool)
+	if cfg.MigrateOnStart {
+		if err := jobs.Migrate(ctx, pool); err != nil {
+			return err
+		}
+	}
+	queue, err := jobs.New(jobs.Options{
+		Pool:       pool,
+		Queries:    queries,
+		Classifier: newClassifier(cfg, queries, log),
+		Logger:     log,
+		RunWorkers: cfg.RunWorkers,
+	})
+	if err != nil {
+		return fmt.Errorf("job queue: %w", err)
+	}
+	if err := queue.Start(ctx); err != nil {
+		return fmt.Errorf("start workers: %w", err)
+	}
+
 	srv := &http.Server{
 		Addr: cfg.Addr,
 		Handler: api.New(api.Options{
-			Queries:     db.New(pool),
+			Queries:     queries,
 			Logger:      log,
 			Verifier:    verifier,
 			Ping:        pool.Ping,
 			CORSOrigins: cfg.CORSOrigins,
+			Enqueuer:    queue,
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
@@ -94,7 +119,39 @@ func run(log *slog.Logger) error {
 	}
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
-	return srv.Shutdown(shutdownCtx)
+	err = srv.Shutdown(shutdownCtx)
+	if qerr := queue.Stop(shutdownCtx); qerr != nil {
+		log.Warn("stopping workers", "err", qerr)
+	}
+	return err
+}
+
+// newClassifier wires whichever AI services are configured. Missing keys
+// turn the matching step off instead of failing the boot, so the API runs
+// locally without any of them.
+func newClassifier(cfg config.Config, q db.Querier, log *slog.Logger) *classify.Classifier {
+	c := &classify.Classifier{
+		Q: q, Log: log,
+		Threshold: cfg.JevThreshold, SameName: 0.85,
+		Neighbors: 5, MinSimilarity: 0.45,
+	}
+	if cfg.TypeSafeAPIKey != "" {
+		c.Jev = &ai.Jev{BaseURL: cfg.TypeSafeBaseURL, APIKey: cfg.TypeSafeAPIKey, Model: cfg.JevModel}
+	} else {
+		log.Warn("classify: TYPESAFE_API_KEY not set; items won't be matched to existing categories")
+	}
+	if cfg.EmbeddingsAPIKey != "" {
+		c.Embed = &ai.Embedder{BaseURL: cfg.EmbeddingsBaseURL, APIKey: cfg.EmbeddingsAPIKey, Model: cfg.EmbeddingsModel}
+	} else {
+		log.Warn("classify: EMBEDDINGS_API_KEY not set; no graph links or duplicate-category checks")
+	}
+	if cfg.NamerEnabled && cfg.AnthropicAPIKey != "" {
+		c.Namer = ai.NewNamer(cfg.AnthropicAPIKey, cfg.NamerModel)
+	} else {
+		log.Warn("classify: ANTHROPIC_API_KEY not set or namer disabled; no new categories will be created")
+	}
+	c.Notify = &push.Expo{Q: q, AccessToken: cfg.ExpoAccessToken}
+	return c
 }
 
 func migrate(ctx context.Context, pool *pgxpool.Pool) error {

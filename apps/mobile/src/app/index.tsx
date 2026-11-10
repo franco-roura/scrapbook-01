@@ -120,7 +120,11 @@ function Row({ item, index }: { item: Item; index: number }) {
           </Text>
         )}
         <View className="flex-row items-center gap-2">
-          {item.category ? <Chip tone="signal">{item.category.name}</Chip> : null}
+          {item.category ? (
+            <Chip tone="signal">{item.category.name}</Chip>
+          ) : item.classifying ? (
+            <Chip>Sorting…</Chip>
+          ) : null}
           <Text variant="bodySm" numberOfLines={1} className="flex-1">
             {hostOf(item.url)}
           </Text>

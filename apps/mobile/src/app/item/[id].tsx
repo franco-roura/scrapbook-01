@@ -8,6 +8,7 @@ import { ApiError, type Item } from '../../lib/api';
 import { api } from '../../lib/client';
 import { platformLabel } from '../../lib/links';
 import { DESCRIPTION_MAX } from '../../share/ShareSheet';
+import { CategoryPanel } from '../../ui/CategoryPanel';
 import { Button, Chip, Field, HudLabel, Panel, Text, colors } from '../../ui/module01';
 
 export default function ItemScreen() {
@@ -27,12 +28,29 @@ export default function ItemScreen() {
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Something went wrong.'));
   }, [id]);
 
+  // While the server sorts a new description, check back for the category
+  // (every 2 s, for up to a minute).
+  const [polls, setPolls] = useState(0);
+  const classifying = item?.classifying ?? false;
+  useEffect(() => {
+    if (!classifying || polls >= 30) return;
+    const t = setTimeout(() => {
+      api
+        .getItem(id)
+        .then((it) => setItem((prev) => (prev ? { ...prev, category: it.category, categorySource: it.categorySource, classifying: it.classifying } : it)))
+        .catch(() => undefined)
+        .finally(() => setPolls((n) => n + 1));
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [classifying, polls, id]);
+
   async function save() {
     if (!item) return;
     setSaving(true);
     try {
       const updated = await api.describeItem(item.id, description);
       setItem(updated);
+      setPolls(0);
       setDescription(updated.description ?? '');
       setError(null);
     } catch (e) {
@@ -101,6 +119,8 @@ export default function ItemScreen() {
             Save description
           </Button>
         </Panel>
+
+        <CategoryPanel item={item} onChange={setItem} />
 
         <Button variant="destructive" onPress={remove}>
           Delete
