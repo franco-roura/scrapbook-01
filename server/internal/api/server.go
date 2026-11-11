@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/aaugoustis/waitlist/server/internal/auth"
+	"github.com/aaugoustis/waitlist/server/internal/credits"
 	"github.com/aaugoustis/waitlist/server/internal/db"
 )
 
@@ -25,6 +26,7 @@ type Server struct {
 	authMW  func(http.Handler) http.Handler
 	cors    map[string]bool
 	enqueue Enqueuer
+	credits *credits.Ledger
 }
 
 // Enqueuer queues background work. The jobs package implements it.
@@ -43,10 +45,12 @@ type Options struct {
 	CORSOrigins []string
 	// Enqueuer queues classification after saves. Optional.
 	Enqueuer Enqueuer
+	// Credits serves GET /v1/credits. Optional.
+	Credits *credits.Ledger
 }
 
 func New(o Options) *Server {
-	s := &Server{q: o.Queries, log: o.Logger, ping: o.Ping, cors: map[string]bool{}, enqueue: o.Enqueuer}
+	s := &Server{q: o.Queries, log: o.Logger, ping: o.Ping, cors: map[string]bool{}, enqueue: o.Enqueuer, credits: o.Credits}
 	for _, origin := range o.CORSOrigins {
 		s.cors[origin] = true
 	}
@@ -77,6 +81,7 @@ func (s *Server) routes(authMW func(http.Handler) http.Handler) http.Handler {
 	v1.HandleFunc("DELETE /v1/items/{id}", s.deleteItem)
 	v1.HandleFunc("GET /v1/items/{id}/neighbors", s.getNeighbors)
 	v1.HandleFunc("GET /v1/graph", s.getGraph)
+	v1.HandleFunc("GET /v1/credits", s.getCredits)
 	v1.HandleFunc("GET /v1/categories", s.listCategories)
 	v1.HandleFunc("POST /v1/categories", s.createCategory)
 	v1.HandleFunc("PUT /v1/devices/{token}", s.registerDevice)

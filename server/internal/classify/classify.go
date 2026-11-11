@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/aaugoustis/waitlist/server/internal/ai"
+	"github.com/aaugoustis/waitlist/server/internal/credits"
 	"github.com/aaugoustis/waitlist/server/internal/db"
 )
 
@@ -55,7 +56,10 @@ type Classifier struct {
 	Embed  Embedder // nil: no graph links and no duplicate-name check
 	Namer  Namer    // nil: no new categories are created
 	Notify Notifier // nil: no notifications
-	Log    *slog.Logger
+	// Credits, when set, gates AI work on the user's balance and charges
+	// what each run cost.
+	Credits *credits.Ledger
+	Log     *slog.Logger
 
 	// Threshold is the Jev confidence needed to file into an existing category.
 	Threshold float64
@@ -94,6 +98,25 @@ func (c *Classifier) Run(ctx context.Context, itemID uuid.UUID) (Result, error) 
 	}
 	desc := *it.Description
 	var res Result
+
+	if c.Credits != nil {
+		ok, err := c.Credits.CanSpend(ctx, it.UserID)
+		if err != nil {
+			return res, err
+		}
+		if !ok {
+			// Left unclassified: the sweep retries once credits are added.
+			return Result{Skipped: "no credits"}, nil
+		}
+		var meter *ai.Meter
+		ctx, meter = ai.WithMeter(ctx)
+		// Charge whatever was spent, even if a later step fails and retries.
+		defer func() {
+			if cerr := c.Credits.Charge(context.WithoutCancel(ctx), it.UserID, "classify", &it.ID, meter); cerr != nil {
+				c.log().ErrorContext(ctx, "charge credits", "item", it.ID, "err", cerr)
+			}
+		}()
+	}
 
 	var vec []float32
 	if c.Embed != nil {

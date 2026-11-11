@@ -23,6 +23,16 @@ export type Item = {
 
 export type ItemPage = { items: Item[]; nextCursor: string | null };
 
+export type Credits = {
+  /** Model budget left, in dollars. */
+  balanceUsd: number;
+  /** Rough number of saves the balance can still sort. */
+  savesLeft: number;
+  /** Share of a pack's price that becomes model budget (0.8). */
+  modelShare: number;
+  recent: { amountUsd: number; kind: 'starter' | 'grant' | 'purchase' | 'usage'; step?: string; itemId?: string; createdAt: string }[];
+};
+
 export type CategorySummary = Category & { itemCount: number; createdAt: string };
 
 export class ApiError extends Error {
@@ -105,6 +115,8 @@ export function createApi({ baseUrl, getToken, fetch: f = fetch }: Options) {
 
     registerDevice: (token: string, platform: 'ios' | 'android') =>
       request<void>('PUT', `/v1/devices/${encodeURIComponent(token)}`, { platform }),
+
+    getCredits: () => request<Credits>('GET', '/v1/credits'),
 
     /** Every item, category hub and link, for the graph view. */
     getGraph: () => request<GraphData>('GET', '/v1/graph'),

@@ -20,6 +20,9 @@ type Embedder struct {
 	APIKey  string
 	Model   string // e.g. openai/text-embedding-3-small
 	HTTP    *http.Client
+	// Price per million input tokens, for metering ($0.02/M for
+	// text-embedding-3-small).
+	Price Price
 }
 
 type embedRequest struct {
@@ -32,6 +35,9 @@ type embedResponse struct {
 		Index     int       `json:"index"`
 		Embedding []float32 `json:"embedding"`
 	} `json:"data"`
+	Usage struct {
+		PromptTokens int64 `json:"prompt_tokens"`
+	} `json:"usage"`
 }
 
 // Embed returns one vector per input, in input order.
@@ -48,6 +54,13 @@ func (e *Embedder) Embed(ctx context.Context, inputs ...string) ([][]float32, er
 	if err := postJSON(ctx, c, strings.TrimRight(e.BaseURL, "/")+"/embeddings", e.APIKey, body, &resp); err != nil {
 		return nil, fmt.Errorf("embeddings: %w", err)
 	}
+	tokens := resp.Usage.PromptTokens
+	if tokens == 0 {
+		for _, in := range inputs {
+			tokens += estimateTokens(in)
+		}
+	}
+	record(ctx, Usage{Service: "embeddings", Model: e.Model, InputTokens: tokens, Cost: e.Price.cost(tokens, 0)})
 	if len(resp.Data) != len(inputs) {
 		return nil, fmt.Errorf("embeddings: got %d vectors for %d inputs", len(resp.Data), len(inputs))
 	}
@@ -61,6 +74,10 @@ func (e *Embedder) Embed(ctx context.Context, inputs ...string) ([][]float32, er
 	}
 	return out, nil
 }
+
+// estimateTokens is a rough count (~4 characters per token) for providers
+// that don't report usage.
+func estimateTokens(s string) int64 { return int64(len(s)/4 + 1) }
 
 // VectorLiteral formats v the way pgvector parses text: "[0.1,0.2,...]".
 func VectorLiteral(v []float32) string {

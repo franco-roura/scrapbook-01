@@ -22,6 +22,7 @@ import (
 	"github.com/aaugoustis/waitlist/server/internal/auth"
 	"github.com/aaugoustis/waitlist/server/internal/classify"
 	"github.com/aaugoustis/waitlist/server/internal/config"
+	"github.com/aaugoustis/waitlist/server/internal/credits"
 	"github.com/aaugoustis/waitlist/server/internal/db"
 	"github.com/aaugoustis/waitlist/server/internal/jobs"
 	"github.com/aaugoustis/waitlist/server/internal/mcpserver"
@@ -74,7 +75,9 @@ func run(log *slog.Logger) error {
 			return err
 		}
 	}
+	ledger := &credits.Ledger{Q: queries, Starter: cfg.StarterCredits}
 	classifier := newClassifier(cfg, queries, log)
+	classifier.Credits = ledger
 	queue, err := jobs.New(jobs.Options{
 		Pool:       pool,
 		Queries:    queries,
@@ -91,7 +94,7 @@ func run(log *slog.Logger) error {
 
 	// The MCP endpoint (and its OAuth metadata) lives next to the app's API.
 	mcpOpts := mcpserver.Options{
-		Queries: queries, Verifier: verifier, Enqueuer: queue, Logger: log,
+		Queries: queries, Verifier: verifier, Enqueuer: queue, Logger: log, Credits: ledger,
 		PublicURL: cfg.PublicURL, AuthServer: cfg.Issuer(),
 	}
 	if classifier.Embed != nil {
@@ -108,6 +111,7 @@ func run(log *slog.Logger) error {
 		Ping:        pool.Ping,
 		CORSOrigins: cfg.CORSOrigins,
 		Enqueuer:    queue,
+		Credits:     ledger,
 	}).Handler())
 
 	srv := &http.Server{
@@ -152,17 +156,21 @@ func newClassifier(cfg config.Config, q db.Querier, log *slog.Logger) *classify.
 		Neighbors: 5, MinSimilarity: 0.45,
 	}
 	if cfg.TypeSafeAPIKey != "" {
-		c.Jev = &ai.Jev{BaseURL: cfg.TypeSafeBaseURL, APIKey: cfg.TypeSafeAPIKey, Model: cfg.JevModel}
+		c.Jev = &ai.Jev{BaseURL: cfg.TypeSafeBaseURL, APIKey: cfg.TypeSafeAPIKey, Model: cfg.JevModel,
+			Price: ai.Price{Input: cfg.JevPrice}}
 	} else {
 		log.Warn("classify: TYPESAFE_API_KEY not set; items won't be matched to existing categories")
 	}
 	if cfg.EmbeddingsAPIKey != "" {
-		c.Embed = &ai.Embedder{BaseURL: cfg.EmbeddingsBaseURL, APIKey: cfg.EmbeddingsAPIKey, Model: cfg.EmbeddingsModel}
+		c.Embed = &ai.Embedder{BaseURL: cfg.EmbeddingsBaseURL, APIKey: cfg.EmbeddingsAPIKey, Model: cfg.EmbeddingsModel,
+			Price: ai.Price{Input: cfg.EmbeddingsPrice}}
 	} else {
 		log.Warn("classify: EMBEDDINGS_API_KEY not set; no graph links or duplicate-category checks")
 	}
 	if cfg.NamerEnabled && cfg.AnthropicAPIKey != "" {
-		c.Namer = ai.NewNamer(cfg.AnthropicAPIKey, cfg.NamerModel)
+		namer := ai.NewNamer(cfg.AnthropicAPIKey, cfg.NamerModel)
+		namer.Price = ai.Price{Input: cfg.NamerInputPrice, Output: cfg.NamerOutputPrice}
+		c.Namer = namer
 	} else {
 		log.Warn("classify: ANTHROPIC_API_KEY not set or namer disabled; no new categories will be created")
 	}

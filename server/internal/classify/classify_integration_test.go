@@ -26,6 +26,7 @@ import (
 	"github.com/aaugoustis/waitlist/server/db/migrations"
 	"github.com/aaugoustis/waitlist/server/internal/ai"
 	"github.com/aaugoustis/waitlist/server/internal/classify"
+	"github.com/aaugoustis/waitlist/server/internal/credits"
 	"github.com/aaugoustis/waitlist/server/internal/db"
 	"github.com/aaugoustis/waitlist/server/internal/jobs"
 )
@@ -304,4 +305,54 @@ func TestQueueRunsClassification(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 	t.Fatal("item wasn't classified within 15s")
+}
+
+// pricedEmbedder charges 40 µ$ per call, so runs have a visible cost.
+type pricedEmbedder struct{ bagOfWords }
+
+func (p *pricedEmbedder) Embed(ctx context.Context, inputs ...string) ([][]float32, error) {
+	ai.RecordUsage(ctx, ai.Usage{Service: "embeddings", Cost: 40})
+	return p.bagOfWords.Embed(ctx, inputs...)
+}
+
+func TestCreditsGateAndCharge(t *testing.T) {
+	q, _ := setup(t)
+	ctx := context.Background()
+	user := uuid.New()
+	ledger := &credits.Ledger{Q: q, Starter: 50} // enough for one run
+	c := &classify.Classifier{
+		Q: q, Jev: &wordJev{}, Embed: &pricedEmbedder{}, Namer: &fixedNamer{names: []string{"Cooking"}},
+		Credits: ledger, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Threshold: 0.6, SameName: 0.85, Neighbors: 5, MinSimilarity: 0.45,
+	}
+
+	first := save(t, q, user, "https://e.com/1", "lemon pasta recipe")
+	res, err := c.Run(ctx, first)
+	if err != nil || res.Category != "Cooking" {
+		t.Fatalf("first run: %+v %v", res, err)
+	}
+	// Two embeddings (description + new category name) at 40 each.
+	if b, _ := ledger.Balance(ctx, user); b != 50-80 {
+		t.Fatalf("balance after first run = %d", b)
+	}
+
+	second := save(t, q, user, "https://e.com/2", "lemon cake recipe")
+	res, err = c.Run(ctx, second)
+	if err != nil || res.Skipped != "no credits" {
+		t.Fatalf("second run: %+v %v", res, err)
+	}
+	if ids, _ := q.ItemsNeedingClassification(ctx, 10); len(ids) != 0 {
+		t.Fatalf("sweep picked up an out-of-credits user's item: %v", ids)
+	}
+
+	// A top-up makes the item eligible again.
+	if _, _, err := ledger.Grant(ctx, user, 1000, "test", nil); err != nil {
+		t.Fatal(err)
+	}
+	if ids, _ := q.ItemsNeedingClassification(ctx, 10); len(ids) != 1 || ids[0] != second {
+		t.Fatalf("after top-up the sweep found %v", ids)
+	}
+	if res, err = c.Run(ctx, second); err != nil || res.Category != "Cooking" {
+		t.Fatalf("after top-up: %+v %v", res, err)
+	}
 }

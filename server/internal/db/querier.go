@@ -11,17 +11,28 @@ import (
 )
 
 type Querier interface {
+	// Records a ledger entry and moves the balance in one statement. A repeated
+	// reference (a payment webhook delivered twice) changes nothing and
+	// returns no row.
+	AddCredits(ctx context.Context, arg AddCreditsParams) (int64, error)
 	// Only while the classifier owns the category and the description hasn't
 	// changed since this job read it.
 	AssignAutoCategory(ctx context.Context, arg AssignAutoCategoryParams) (int64, error)
+	// Typical cost of sorting one item for this user (last 50), to estimate
+	// how many saves the balance covers.
+	AverageClassifyCost(ctx context.Context, userID uuid.UUID) (float64, error)
 	CategoryBelongsToUser(ctx context.Context, arg CategoryBelongsToUserParams) (bool, error)
 	DeleteDevice(ctx context.Context, arg DeleteDeviceParams) error
 	// Tokens Expo reports as no longer registered.
 	DeleteDeviceTokens(ctx context.Context, tokens []string) error
 	DeleteEdgesForItem(ctx context.Context, itemID uuid.UUID) error
 	DeleteItem(ctx context.Context, arg DeleteItemParams) (int64, error)
+	// Gives a new user their free starter credits once, and returns the
+	// balance either way.
+	EnsureStarterCredits(ctx context.Context, arg EnsureStarterCreditsParams) (int64, error)
 	// The user's category whose name is closest in meaning to a proposed name.
 	FindSimilarCategory(ctx context.Context, arg FindSimilarCategoryParams) (FindSimilarCategoryRow, error)
+	GetCreditBalance(ctx context.Context, userID uuid.UUID) (int64, error)
 	GetItem(ctx context.Context, arg GetItemParams) (GetItemRow, error)
 	GetItemForClassify(ctx context.Context, id uuid.UUID) (GetItemForClassifyRow, error)
 	// Creating a name that exists (ignoring case) returns the existing category.
@@ -30,11 +41,14 @@ type Querier interface {
 	// Links an item to its nearest neighbours by embedding (cosine), keeping
 	// only reasonably similar ones. Each pair is stored once with src < dst.
 	InsertSimilarEdges(ctx context.Context, arg InsertSimilarEdgesParams) error
+	// Skips users who are out of credits (a missing balance row means a new
+	// user who still gets starter credits).
 	ItemsNeedingClassification(ctx context.Context, lim int32) ([]uuid.UUID, error)
 	ListCategories(ctx context.Context, userID uuid.UUID) ([]ListCategoriesRow, error)
 	// Each category with up to three recent item descriptions, which tell Jev
 	// what the user actually files there.
 	ListCategoriesForClassify(ctx context.Context, userID uuid.UUID) ([]ListCategoriesForClassifyRow, error)
+	ListCreditLedger(ctx context.Context, arg ListCreditLedgerParams) ([]ListCreditLedgerRow, error)
 	ListDeviceTokens(ctx context.Context, userID uuid.UUID) ([]string, error)
 	ListEdgesForUser(ctx context.Context, userID uuid.UUID) ([]ListEdgesForUserRow, error)
 	// The newest items for the graph view, with their categories.

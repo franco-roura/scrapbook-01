@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/aaugoustis/waitlist/server/internal/auth"
+	"github.com/aaugoustis/waitlist/server/internal/credits"
 	"github.com/aaugoustis/waitlist/server/internal/db"
 )
 
@@ -553,5 +554,49 @@ func TestGraphEndpoints(t *testing.T) {
 	var empty graphJSON
 	if code := h.do(stranger, "GET", "/v1/graph", "", &empty); code != http.StatusOK || len(empty.Nodes) != 0 {
 		t.Fatalf("stranger graph: %d %+v", code, empty)
+	}
+}
+
+func (f *fakeQueries) EnsureStarterCredits(_ context.Context, a db.EnsureStarterCreditsParams) (int64, error) {
+	return a.Starter, nil
+}
+
+func (f *fakeQueries) AverageClassifyCost(context.Context, uuid.UUID) (float64, error) { return 0, nil }
+
+func (f *fakeQueries) ListCreditLedger(context.Context, db.ListCreditLedgerParams) ([]db.ListCreditLedgerRow, error) {
+	return []db.ListCreditLedgerRow{
+		{Amount: -42, Kind: "usage", Detail: []byte(`{"step":"classify"}`), CreatedAt: time.Now()},
+		{Amount: 100_000, Kind: "starter", Detail: []byte(`{}`), CreatedAt: time.Now()},
+	}, nil
+}
+
+func TestCredits(t *testing.T) {
+	q := newFake()
+	s := New(Options{
+		Queries: q, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Verifier: auth.NewHS256(testSecret, testIssuer),
+		Credits:  &credits.Ledger{Q: q, Starter: 90_000},
+	})
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+	h := &harness{t: t, srv: srv, q: q}
+
+	var got struct {
+		BalanceUSD float64 `json:"balanceUsd"`
+		SavesLeft  int     `json:"savesLeft"`
+		ModelShare float64 `json:"modelShare"`
+		Recent     []struct {
+			AmountUSD float64 `json:"amountUsd"`
+			Kind      string
+			Step      string
+		}
+	}
+	if code := h.do(uuid.New(), "GET", "/v1/credits", "", &got); code != http.StatusOK {
+		t.Fatalf("status %d", code)
+	}
+	// $0.09 at the default ~30 µ$ per save.
+	if got.BalanceUSD != 0.09 || got.SavesLeft != 3000 || got.ModelShare != 0.8 || len(got.Recent) != 2 ||
+		got.Recent[0].Step != "classify" || got.Recent[0].AmountUSD != -0.000042 {
+		t.Fatalf("credits = %+v", got)
 	}
 }

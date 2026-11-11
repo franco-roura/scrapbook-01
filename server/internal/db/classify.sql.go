@@ -135,12 +135,16 @@ func (q *Queries) InsertSimilarEdges(ctx context.Context, arg InsertSimilarEdges
 }
 
 const itemsNeedingClassification = `-- name: ItemsNeedingClassification :many
-SELECT id FROM items
-WHERE description IS NOT NULL AND classified_at IS DISTINCT FROM described_at
-ORDER BY described_at
+SELECT i.id FROM items i
+LEFT JOIN credit_balances b ON b.user_id = i.user_id
+WHERE i.description IS NOT NULL AND i.classified_at IS DISTINCT FROM i.described_at
+  AND (b.balance IS NULL OR b.balance > 0)
+ORDER BY i.described_at
 LIMIT $1
 `
 
+// Skips users who are out of credits (a missing balance row means a new
+// user who still gets starter credits).
 func (q *Queries) ItemsNeedingClassification(ctx context.Context, lim int32) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, itemsNeedingClassification, lim)
 	if err != nil {

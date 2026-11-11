@@ -26,6 +26,7 @@ import (
 
 	"github.com/aaugoustis/waitlist/server/internal/ai"
 	"github.com/aaugoustis/waitlist/server/internal/auth"
+	"github.com/aaugoustis/waitlist/server/internal/credits"
 	"github.com/aaugoustis/waitlist/server/internal/db"
 	"github.com/aaugoustis/waitlist/server/internal/graph"
 	"github.com/aaugoustis/waitlist/server/internal/links"
@@ -49,7 +50,10 @@ type Options struct {
 	Verifier *auth.Verifier
 	Embed    Embedder // optional: without it, search matches keywords
 	Enqueuer Enqueuer // optional: classification after save_item
-	Logger   *slog.Logger
+	// Credits, when set: semantic search is charged to the user, and users
+	// out of credits get keyword search (free) instead.
+	Credits *credits.Ledger
+	Logger  *slog.Logger
 	// PublicURL is the API's external origin, e.g. https://api.scrapbook01.app.
 	PublicURL string
 	// AuthServer is Supabase Auth's issuer, e.g. https://abc.supabase.co/auth/v1.
@@ -220,7 +224,22 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in Search
 	}
 
 	out := SearchOutput{Results: []Result{}}
-	if s.o.Embed != nil {
+	semantic := s.o.Embed != nil
+	if semantic && s.o.Credits != nil {
+		if semantic, err = s.o.Credits.CanSpend(ctx, user); err != nil {
+			return nil, out, err
+		}
+		if semantic {
+			var meter *ai.Meter
+			ctx, meter = ai.WithMeter(ctx)
+			defer func() {
+				if cerr := s.o.Credits.Charge(context.WithoutCancel(ctx), user, "search", nil, meter); cerr != nil {
+					s.o.Logger.ErrorContext(ctx, "mcp search: charge credits", "err", cerr)
+				}
+			}()
+		}
+	}
+	if semantic {
 		vecs, err := s.o.Embed.Embed(ctx, q)
 		if err == nil {
 			rows, err := s.o.Queries.SearchItemsByVector(ctx, db.SearchItemsByVectorParams{

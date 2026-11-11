@@ -10,7 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AndroidShareListener } from '../share/AndroidShareListener';
 import { AuthProvider } from '../lib/auth';
 import { PushRegistrar } from '../lib/push';
-import { SignOutButton } from '../ui/SignOutButton';
+import { HeaderActions } from '../ui/HeaderActions';
 import { colors } from '../ui/module01';
 
 export default function RootLayout() {
@@ -42,12 +42,13 @@ export default function RootLayout() {
             name="index"
             options={{
               title: 'Scrapbook/01',
-              headerRight: () => <SignOutButton />,
+              headerRight: () => <HeaderActions />,
             }}
           />
           <Stack.Screen name="sign-in" options={{ title: 'Sign in' }} />
           <Stack.Screen name="item/[id]" options={{ title: 'Item' }} />
           <Stack.Screen name="graph" options={{ title: 'Graph' }} />
+          <Stack.Screen name="credits" options={{ title: 'Credits' }} />
           <Stack.Screen name="oauth/consent" options={{ title: 'Connect' }} />
           <Stack.Screen name="share" options={{ presentation: 'modal', headerShown: false }} />
         </Stack>

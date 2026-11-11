@@ -80,7 +80,8 @@ func jev(w http.ResponseWriter, r *http.Request) {
 		}
 		answers[id] = map[string]any{"type": "choice", "choice": best, "confidence": 0.9, "probabilities": map[string]float64{best: 0.9}}
 	}
-	writeJSON(w, map[string]any{"model": "fake-jev", "answers": answers, "usage": map[string]int{"input_tokens": 0, "output_tokens": 0}})
+	// Rough usage so local runs exercise credit metering.
+	writeJSON(w, map[string]any{"model": "fake-jev", "answers": answers, "usage": map[string]int{"input_tokens": 300, "output_tokens": 0}})
 }
 
 func embeddings(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +111,7 @@ func embeddings(w http.ResponseWriter, r *http.Request) {
 		}
 		data[i] = map[string]any{"index": i, "embedding": v}
 	}
-	writeJSON(w, map[string]any{"data": data})
+	writeJSON(w, map[string]any{"data": data, "usage": map[string]int{"prompt_tokens": 20 * len(req.Input)}})
 }
 
 func messages(w http.ResponseWriter, r *http.Request) {
@@ -139,7 +140,7 @@ func messages(w http.ResponseWriter, r *http.Request) {
 		"id": "msg_fake", "type": "message", "role": "assistant", "model": "fake",
 		"content":     []map[string]string{{"type": "text", "text": name}},
 		"stop_reason": "end_turn", "stop_sequence": nil,
-		"usage": map[string]int{"input_tokens": 0, "output_tokens": 0},
+		"usage": map[string]int{"input_tokens": 250, "output_tokens": 300},
 	})
 }
 

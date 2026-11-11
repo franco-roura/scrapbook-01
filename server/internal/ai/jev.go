@@ -22,6 +22,9 @@ type Jev struct {
 	APIKey  string
 	Model   string // e.g. jev-latest
 	HTTP    *http.Client
+	// Price per million tokens, for metering. Jev reportedly bills input
+	// only (about $0.042/M); check TypeSafe's live pricing.
+	Price Price
 }
 
 // Choice is Jev's answer to a "choice" question.
@@ -45,6 +48,10 @@ type jevRequest struct {
 
 type jevResponse struct {
 	Answers map[string]json.RawMessage `json:"answers"`
+	Usage   struct {
+		InputTokens  int64 `json:"input_tokens"`
+		OutputTokens int64 `json:"output_tokens"`
+	} `json:"usage"`
 }
 
 // Choose asks Jev which of the options (label → description, which may be
@@ -74,6 +81,11 @@ func (j *Jev) Choose(ctx context.Context, state, instructions string, options ma
 	if err := postJSON(ctx, j.client(), strings.TrimRight(j.BaseURL, "/")+"/v1/systemone", j.APIKey, body, &resp); err != nil {
 		return Choice{}, fmt.Errorf("jev: %w", err)
 	}
+	in, out := resp.Usage.InputTokens, resp.Usage.OutputTokens
+	if in == 0 {
+		in = estimateTokens(state) + estimateTokens(instructions) + int64(len(options))*20
+	}
+	record(ctx, Usage{Service: "jev", Model: j.Model, InputTokens: in, OutputTokens: out, Cost: j.Price.cost(in, out)})
 	raw, ok := resp.Answers["answer"]
 	if !ok {
 		return Choice{}, fmt.Errorf("jev: response has no answer")

@@ -1,6 +1,6 @@
 # Scrapbook/01 API (Go)
 
-The Go API behind Scrapbook/01. Signed-in users save shared links with an optional "What is it about?" description (Phase 1). A background job then files each described item into a category and links it to similar items (Phase 3), which the app draws as a graph (Phase 4). Users' own AI assistants can search the library over MCP (Phase 5).
+The Go API behind Scrapbook/01. Signed-in users save shared links with an optional "What is it about?" description (Phase 1). A background job then files each described item into a category and links it to similar items (Phase 3), which the app draws as a graph (Phase 4). Users' own AI assistants can search the library over MCP (Phase 5). AI work is paid from prepaid credits (Phase 6).
 
 ## How items get a category
 
@@ -12,7 +12,7 @@ After a save or a description edit, a [River](https://riverqueue.com) job (store
 4. **Graph links**: the 5 nearest items by cosine similarity (≥ 0.45) become `edges`.
 5. A push notification ("Saved to *Parenting*") goes to the user's phones through Expo.
 
-Re-saving a link without a new description, or a category the user picked themselves, costs nothing: `described_at` only moves when the text changes, and `category_source = 'user'` is never overwritten. Corrections are stored in `category_feedback` for tuning. A sweep every 5 minutes re-queues anything missed. Each missing key turns its step off (with a warning) instead of failing the boot.
+Re-saving a link without a new description, or a category the user picked themselves, costs nothing: `described_at` only moves when the text changes, and `category_source = 'user'` is never overwritten. Corrections are stored in `category_feedback` for tuning. A sweep every minute re-queues anything missed, including items that waited for a credit top-up. Each missing key turns its step off (with a warning) instead of failing the boot.
 
 ## Run locally
 
@@ -47,6 +47,17 @@ All `/v1` routes need a token. Users only ever see their own items.
 Items include `category`, `categorySource` (`auto` or `user`) and `classifying` (true while a new description waits for its category). `GET /v1/items` also takes `categoryId`.
 
 Errors look like `{"error": {"code": "invalid_url", "message": "..."}}`.
+
+## Credits
+
+Every AI call is metered: the clients record tokens and cost (list price × tokens) on a per-job meter, and the job charges the total to the user's ledger (`credit_ledger`, `credit_balances`). Amounts are micro-dollars of model cost.
+
+- **New users** get `STARTER_CREDITS_USD` of budget the first time they're seen.
+- **Packs**: `credits.Ledger.RecordPurchase(user, price, pack, paymentRef)` adds 80% of the price as budget, the split promised on the waitlist page. The payment reference is unique, so a payment notification processed twice credits once. Until a payment provider is wired in, use the CLI: `go run ./cmd/credits purchase -user <uuid> -price 5 -pack starter -ref <payment id>` (or `grant`, `balance`).
+- **Out of credits**: saves are still kept, but classification waits; the sweep skips the user until a top-up, then sorts the waiting items within a minute. MCP search falls back to free keyword matching. A run can dip slightly below zero, since it's charged after it finishes.
+- `GET /v1/credits` returns the balance, an estimate of saves left (from the user's average cost), and recent activity.
+
+Typical costs at list prices: about $0.000014 to sort a save into an existing category (Jev + one embedding), about $0.0002 when Claude Haiku names a new category.
 
 ## MCP: the library in Claude, ChatGPT and other assistants
 
@@ -83,6 +94,7 @@ TYPESAFE_API_KEY=dev TYPESAFE_BASE_URL=http://127.0.0.1:8787 EMBEDDINGS_API_KEY=
 - `db/migrations`: goose SQL migrations, embedded into the binary.
 - `db/queries`: SQL for sqlc. Generated Go code is in `internal/db` (don't edit it).
 - `internal/api`: handlers. `internal/auth`: token checks. `internal/links`: URL cleanup and platform detection.
+- `internal/credits`: the prepaid ledger. `cmd/credits`: grant or record purchases by hand.
 - `internal/graph`: builds graph and neighborhood responses. `internal/mcpserver`: the MCP tools and their OAuth wiring.
 - `internal/classify`: the sorting pipeline. `internal/ai`: Jev, embeddings and Claude clients. `internal/jobs`: River setup. `internal/push`: Expo notifications.
 
@@ -101,7 +113,7 @@ On macOS or Linux, use `"$(pwd)"` instead of `"$(pwd -W)"` and drop `MSYS_NO_PAT
 ```bash
 go test ./...
 TEST_DATABASE_URL='postgres://scrapbook:scrapbook@localhost:54329/scrapbook?sslmode=disable' \
-  go test -tags integration -p 1 ./internal/db/ ./internal/classify/ ./internal/mcpserver/
+  go test -tags integration -p 1 ./internal/db/ ./internal/classify/ ./internal/mcpserver/ ./internal/credits/
 ```
 
 The integration tests reset the schema, so point them at a disposable database.

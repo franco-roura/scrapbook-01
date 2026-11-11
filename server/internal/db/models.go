@@ -29,6 +29,23 @@ type CategoryFeedback struct {
 	CreatedAt      time.Time
 }
 
+type CreditBalance struct {
+	UserID    uuid.UUID
+	Balance   int64
+	UpdatedAt time.Time
+}
+
+type CreditLedger struct {
+	ID        int64
+	UserID    uuid.UUID
+	Amount    int64
+	Kind      string
+	ItemID    *uuid.UUID
+	Detail    []byte
+	Reference *string
+	CreatedAt time.Time
+}
+
 type Device struct {
 	Token     string
 	UserID    uuid.UUID

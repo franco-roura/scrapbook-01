@@ -134,7 +134,7 @@ func New(o Options) (*Queue, error) {
 		cfg.Queues = map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: concurrency}}
 		cfg.PeriodicJobs = []*river.PeriodicJob{
 			river.NewPeriodicJob(
-				river.PeriodicInterval(5*time.Minute),
+				river.PeriodicInterval(time.Minute),
 				func() (river.JobArgs, *river.InsertOpts) { return sweepArgs{}, nil },
 				&river.PeriodicJobOpts{RunOnStart: true},
 			),

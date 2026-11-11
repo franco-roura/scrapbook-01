@@ -62,9 +62,13 @@ WHERE n.similarity >= sqlc.arg(min_similarity)::real
 ON CONFLICT (src, dst, kind) DO UPDATE SET weight = EXCLUDED.weight;
 
 -- name: ItemsNeedingClassification :many
-SELECT id FROM items
-WHERE description IS NOT NULL AND classified_at IS DISTINCT FROM described_at
-ORDER BY described_at
+-- Skips users who are out of credits (a missing balance row means a new
+-- user who still gets starter credits).
+SELECT i.id FROM items i
+LEFT JOIN credit_balances b ON b.user_id = i.user_id
+WHERE i.description IS NOT NULL AND i.classified_at IS DISTINCT FROM i.described_at
+  AND (b.balance IS NULL OR b.balance > 0)
+ORDER BY i.described_at
 LIMIT @lim;
 
 -- name: ListEdgesForUser :many

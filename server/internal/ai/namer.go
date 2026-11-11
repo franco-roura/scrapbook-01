@@ -17,6 +17,10 @@ import (
 type Namer struct {
 	client anthropic.Client
 	model  string
+	// Price per million tokens, for metering. Claude Haiku 5.5 lists $0.10
+	// in / $0.50 out (prompts up to 100K tokens). Thinking tokens are
+	// billed as output and are included in the usage the API reports.
+	Price Price
 }
 
 // NewNamer builds a Namer. Extra options (base URL, retries) are mainly for
@@ -71,6 +75,8 @@ func (n *Namer) Name(ctx context.Context, description string, existing []string)
 		}
 		return "", fmt.Errorf("claude: %w", err)
 	}
+	in, out := resp.Usage.InputTokens, resp.Usage.OutputTokens
+	record(ctx, Usage{Service: "claude", Model: n.model, InputTokens: in, OutputTokens: out, Cost: n.Price.cost(in, out)})
 	if resp.StopReason == anthropic.StopReasonRefusal {
 		return "", ErrRefused
 	}

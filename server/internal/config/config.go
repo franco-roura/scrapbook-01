@@ -54,6 +54,11 @@ type Config struct {
 	NamerModel      string
 	NamerEnabled    bool
 
+	// StarterCredits is each new user's free model budget, in micro-dollars.
+	StarterCredits int64
+	// List prices in dollars per million tokens, for metering.
+	JevPrice, EmbeddingsPrice, NamerInputPrice, NamerOutputPrice float64
+
 	// ExpoAccessToken is optional (needed only with Expo push security on).
 	ExpoAccessToken string
 
@@ -83,6 +88,21 @@ func Load() (Config, error) {
 		ExpoAccessToken:   os.Getenv("EXPO_ACCESS_TOKEN"),
 	}
 	var errs []error
+	floatEnv := func(key, fallback string, dst *float64) {
+		v, err := strconv.ParseFloat(env(key, fallback), 64)
+		if err != nil || v < 0 {
+			errs = append(errs, fmt.Errorf("%s must be a non-negative number", key))
+			return
+		}
+		*dst = v
+	}
+	var starterUSD float64
+	floatEnv("STARTER_CREDITS_USD", "0.10", &starterUSD)
+	c.StarterCredits = int64(starterUSD * 1_000_000)
+	floatEnv("JEV_PRICE_PER_MTOK", "0.042", &c.JevPrice)
+	floatEnv("EMBEDDINGS_PRICE_PER_MTOK", "0.02", &c.EmbeddingsPrice)
+	floatEnv("NAMER_INPUT_PRICE_PER_MTOK", "0.10", &c.NamerInputPrice)
+	floatEnv("NAMER_OUTPUT_PRICE_PER_MTOK", "0.50", &c.NamerOutputPrice)
 	if t, err := strconv.ParseFloat(env("JEV_THRESHOLD", "0.6"), 64); err != nil || t < 0 || t > 1 {
 		errs = append(errs, errors.New("JEV_THRESHOLD must be a number from 0 to 1"))
 	} else {

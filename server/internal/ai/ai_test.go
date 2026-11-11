@@ -170,3 +170,56 @@ func TestNamer(t *testing.T) {
 		t.Fatalf("401: err = %v, want ErrRefused", err)
 	}
 }
+
+func TestMetering(t *testing.T) {
+	jev := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"answers":{"answer":{"choice":"A","confidence":1}},"usage":{"input_tokens":1000,"output_tokens":0}}`)
+	}))
+	defer jev.Close()
+	emb := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		v := make([]float32, Dimensions)
+		json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{{"index": 0, "embedding": v}}, "usage": map[string]int{"prompt_tokens": 50}})
+	}))
+	defer emb.Close()
+	claude := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"id":"m","type":"message","role":"assistant","model":"claude-haiku-5-5","content":[{"type":"text","text":"Recipes"}],
+			"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":200,"output_tokens":300}}`)
+	}))
+	defer claude.Close()
+
+	ctx, meter := WithMeter(context.Background())
+	j := &Jev{BaseURL: jev.URL, APIKey: "k", Model: "jev-latest", Price: Price{Input: 0.042}}
+	if _, err := j.Choose(ctx, "s", "i", map[string]string{"A": ""}); err != nil {
+		t.Fatal(err)
+	}
+	e := &Embedder{BaseURL: emb.URL, APIKey: "k", Model: "small", Price: Price{Input: 0.02}}
+	if _, err := e.Embed(ctx, "hello"); err != nil {
+		t.Fatal(err)
+	}
+	n := NewNamer("k", "claude-haiku-5-5", option.WithBaseURL(claude.URL), option.WithMaxRetries(0))
+	n.Price = Price{Input: 0.10, Output: 0.50}
+	if _, err := n.Name(ctx, "lemon pasta", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	recs := meter.Records()
+	if len(recs) != 3 {
+		t.Fatalf("records = %+v", recs)
+	}
+	// $/M tokens = µ$/token: 1000×0.042 = 42, 50×0.02 = 1, 200×0.1 + 300×0.5 = 170.
+	want := map[string]int64{"jev": 42, "embeddings": 1, "claude": 170}
+	for _, r := range recs {
+		if r.Cost != want[r.Service] {
+			t.Errorf("%s cost = %d, want %d (%+v)", r.Service, r.Cost, want[r.Service], r)
+		}
+	}
+	if meter.Total() != 213 {
+		t.Fatalf("total = %d", meter.Total())
+	}
+
+	// Calls outside a metered context are simply not recorded.
+	if _, err := e.Embed(context.Background(), "x"); err != nil || len(meter.Records()) != 3 {
+		t.Fatalf("unmetered call recorded: %v", err)
+	}
+}
