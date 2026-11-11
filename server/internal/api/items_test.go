@@ -35,6 +35,7 @@ type fakeQueries struct {
 	feedback   []db.InsertCategoryFeedbackParams
 	devices    map[string]db.UpsertDeviceParams
 	edges      map[uuid.UUID][]db.ListEdgesForUserRow
+	balances   map[uuid.UUID]int64
 	clock      time.Time
 }
 
@@ -598,5 +599,48 @@ func TestCredits(t *testing.T) {
 	if got.BalanceUSD != 0.09 || got.SavesLeft != 3000 || got.ModelShare != 0.8 || len(got.Recent) != 2 ||
 		got.Recent[0].Step != "classify" || got.Recent[0].AmountUSD != -0.000042 {
 		t.Fatalf("credits = %+v", got)
+	}
+}
+
+func (f *fakeQueries) GetCreditBalance(_ context.Context, user uuid.UUID) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	b, ok := f.balances[user]
+	if !ok {
+		return 0, pgx.ErrNoRows
+	}
+	return b, nil
+}
+
+func TestWaitingForCredits(t *testing.T) {
+	q := newFake()
+	s := New(Options{
+		Queries: q, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Verifier: auth.NewHS256(testSecret, testIssuer),
+		Credits:  &credits.Ledger{Q: q, Starter: 100},
+	})
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+	h := &harness{t: t, srv: srv, q: q}
+	broke, fresh, funded := uuid.New(), uuid.New(), uuid.New()
+	q.balances = map[uuid.UUID]int64{broke: -20, funded: 500}
+
+	for user, want := range map[uuid.UUID]bool{broke: true, fresh: false, funded: false} {
+		var it itemJSON
+		h.do(user, "POST", "/v1/items", `{"url":"https://e.com/x","description":"something"}`, &it)
+		if !it.Classifying || it.WaitingForCredits != want {
+			t.Errorf("user balance %v: classifying=%v waiting=%v, want waiting=%v", q.balances[user], it.Classifying, it.WaitingForCredits, want)
+		}
+		var page listItemsResponse
+		h.do(user, "GET", "/v1/items", "", &page)
+		if len(page.Items) != 1 || page.Items[0].WaitingForCredits != want {
+			t.Errorf("list for balance %v: %+v", q.balances[user], page.Items)
+		}
+	}
+	// Undescribed items aren't waiting for anything.
+	var bare itemJSON
+	h.do(broke, "POST", "/v1/items", `{"url":"https://e.com/y"}`, &bare)
+	if bare.WaitingForCredits {
+		t.Error("undescribed item marked as waiting")
 	}
 }

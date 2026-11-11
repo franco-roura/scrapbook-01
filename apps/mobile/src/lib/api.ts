@@ -15,6 +15,8 @@ export type Item = {
   categorySource: 'auto' | 'user';
   /** True while a new description is waiting for its category. */
   classifying: boolean;
+  /** Waiting only because the credits ran out; sorted after a top-up. */
+  waitingForCredits: boolean;
   previewTitle: string | null;
   previewImage: string | null;
   createdAt: string;

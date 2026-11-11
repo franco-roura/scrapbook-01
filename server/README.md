@@ -44,7 +44,7 @@ All `/v1` routes need a token. Users only ever see their own items.
 | `PUT` | `/v1/devices/{expoPushToken}` | `{"platform": "ios" \| "android"}`. Registers a phone for notifications |
 | `DELETE` | `/v1/devices/{expoPushToken}` | On sign-out |
 
-Items include `category`, `categorySource` (`auto` or `user`) and `classifying` (true while a new description waits for its category). `GET /v1/items` also takes `categoryId`.
+Items include `category`, `categorySource` (`auto` or `user`), `classifying` (true while a new description waits for its category) and `waitingForCredits` (true when it's waiting only because the user is out of credits). `GET /v1/items` also takes `categoryId`.
 
 Errors look like `{"error": {"code": "invalid_url", "message": "..."}}`.
 

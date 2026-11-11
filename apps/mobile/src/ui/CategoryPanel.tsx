@@ -1,5 +1,6 @@
 // Shows an item's category and lets the user move it. Choosing a category
 // here tells the server to stop picking one automatically for this item.
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
@@ -53,14 +54,23 @@ export function CategoryPanel({ item, onChange }: { item: Item; onChange: (item:
     }
   }
 
-  const sorting = item.classifying && item.categorySource === 'auto';
+  const waiting = item.waitingForCredits && item.categorySource === 'auto';
+  const sorting = item.classifying && item.categorySource === 'auto' && !waiting;
 
   return (
     <Panel notch="sm" serial={item.categorySource === 'user' ? 'C-01 · SET BY YOU' : 'C-01 · AUTO'} className="gap-4">
       <View className="flex-row items-center justify-between gap-3">
         <View className="flex-1 gap-1">
           <Text variant="label">Category</Text>
-          {sorting ? (
+          {waiting ? (
+            <View className="gap-1">
+              <Text variant="title">Waiting for credits</Text>
+              <Text variant="bodySm">It’s saved. It will be sorted and linked once you add credits.</Text>
+              <Button variant="ghost" className="self-start px-0" onPress={() => router.push('/credits')}>
+                See credits
+              </Button>
+            </View>
+          ) : sorting ? (
             <View className="flex-row items-center gap-2">
               <ActivityIndicator size="small" color={colors.signalInk} />
               <Text variant="bodySm">Sorting…</Text>

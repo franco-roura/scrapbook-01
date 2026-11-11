@@ -32,13 +32,14 @@ export default function ItemScreen() {
   // While the server sorts a new description, check back for the category
   // (every 2 s, for up to a minute).
   const [polls, setPolls] = useState(0);
-  const classifying = item?.classifying ?? false;
+  // No point checking back while it waits for a credit top-up.
+  const classifying = (item?.classifying ?? false) && !item?.waitingForCredits;
   useEffect(() => {
     if (!classifying || polls >= 30) return;
     const t = setTimeout(() => {
       api
         .getItem(id)
-        .then((it) => setItem((prev) => (prev ? { ...prev, category: it.category, categorySource: it.categorySource, classifying: it.classifying } : it)))
+        .then((it) => setItem((prev) => (prev ? { ...prev, category: it.category, categorySource: it.categorySource, classifying: it.classifying, waitingForCredits: it.waitingForCredits } : it)))
         .catch(() => undefined)
         .finally(() => setPolls((n) => n + 1));
     }, 2000);

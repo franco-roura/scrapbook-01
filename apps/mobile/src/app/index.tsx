@@ -127,6 +127,8 @@ function Row({ item, index }: { item: Item; index: number }) {
         <View className="flex-row items-center gap-2">
           {item.category ? (
             <Chip tone="signal">{item.category.name}</Chip>
+          ) : item.waitingForCredits ? (
+            <Chip>Waiting for credits</Chip>
           ) : item.classifying ? (
             <Chip>Sorting…</Chip>
           ) : null}

@@ -39,11 +39,14 @@ type itemJSON struct {
 	// "user" once the user chose one.
 	CategorySource string `json:"categorySource"`
 	// Classifying is true while a new description waits for a category.
-	Classifying  bool      `json:"classifying"`
-	PreviewTitle *string   `json:"previewTitle"`
-	PreviewImage *string   `json:"previewImage"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	Classifying bool `json:"classifying"`
+	// WaitingForCredits is true when the item is waiting only because the
+	// user is out of credits; it's sorted after a top-up.
+	WaitingForCredits bool      `json:"waitingForCredits"`
+	PreviewTitle      *string   `json:"previewTitle"`
+	PreviewImage      *string   `json:"previewImage"`
+	CreatedAt         time.Time `json:"createdAt"`
+	UpdatedAt         time.Time `json:"updatedAt"`
 }
 
 // GetItemRow and ListItemsRow have the same columns.
@@ -122,7 +125,9 @@ func (s *Server) createItem(w http.ResponseWriter, r *http.Request) {
 	if row.Inserted {
 		status = http.StatusCreated
 	}
-	writeJSON(w, status, toItemJSON(item))
+	out := toItemJSON(item)
+	s.markWaiting(r, &out)
+	writeJSON(w, status, out)
 }
 
 type listItemsResponse struct {
@@ -185,6 +190,11 @@ func (s *Server) listItems(w http.ResponseWriter, r *http.Request) {
 		}
 		resp.Items = append(resp.Items, toItemJSON(db.GetItemRow(row)))
 	}
+	ptrs := make([]*itemJSON, len(resp.Items))
+	for i := range resp.Items {
+		ptrs[i] = &resp.Items[i]
+	}
+	s.markWaiting(r, ptrs...)
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -203,7 +213,9 @@ func (s *Server) getItem(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, r, "get item", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toItemJSON(item))
+	out := toItemJSON(item)
+	s.markWaiting(r, &out)
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) updateItem(w http.ResponseWriter, r *http.Request) {
@@ -303,7 +315,9 @@ func (s *Server) updateItem(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, r, "get updated item", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toItemJSON(item))
+	out := toItemJSON(item)
+	s.markWaiting(r, &out)
+	writeJSON(w, http.StatusOK, out)
 }
 
 func btoi(b bool) int {
@@ -383,6 +397,30 @@ func (s *Server) createCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, categoryJSON{ID: row.ID, Name: row.Name})
+}
+
+// markWaiting flags items that wait for classification only because the
+// user has no credits left. It reads the balance once, and only when some
+// item is still waiting. Errors leave the flags unset.
+func (s *Server) markWaiting(r *http.Request, items ...*itemJSON) {
+	if s.credits == nil {
+		return
+	}
+	waiting := false
+	for _, it := range items {
+		waiting = waiting || it.Classifying
+	}
+	if !waiting {
+		return
+	}
+	user, _ := auth.UserFrom(r.Context())
+	bal, err := s.q.GetCreditBalance(r.Context(), user)
+	if err != nil || bal > 0 { // no row yet: a new user with starter credits coming
+		return
+	}
+	for _, it := range items {
+		it.WaitingForCredits = it.Classifying
+	}
 }
 
 // enqueueClassify queues classification. A failure is logged, not returned:
