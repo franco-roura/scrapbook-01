@@ -29,6 +29,10 @@ type Config struct {
 	// comma-separated CORS_ORIGINS. Empty means no browser access.
 	CORSOrigins []string
 
+	// PublicURL is the API's external origin (no trailing slash). MCP clients
+	// see it in the OAuth protected-resource metadata.
+	PublicURL string
+
 	// RunWorkers processes background jobs (classification) in this process.
 	RunWorkers bool
 
@@ -65,6 +69,7 @@ func Load() (Config, error) {
 		SupabaseJWTSecret: os.Getenv("SUPABASE_JWT_SECRET"),
 		ShutdownTimeout:   10 * time.Second,
 
+		PublicURL:         strings.TrimRight(env("PUBLIC_URL", "http://localhost:8080"), "/"),
 		RunWorkers:        env("RUN_WORKERS", "true") == "true",
 		TypeSafeAPIKey:    os.Getenv("TYPESAFE_API_KEY"),
 		TypeSafeBaseURL:   env("TYPESAFE_BASE_URL", "https://api.typesafe.ai"),

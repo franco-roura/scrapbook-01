@@ -24,6 +24,7 @@ import (
 	"github.com/aaugoustis/waitlist/server/internal/config"
 	"github.com/aaugoustis/waitlist/server/internal/db"
 	"github.com/aaugoustis/waitlist/server/internal/jobs"
+	"github.com/aaugoustis/waitlist/server/internal/mcpserver"
 	"github.com/aaugoustis/waitlist/server/internal/push"
 )
 
@@ -73,10 +74,11 @@ func run(log *slog.Logger) error {
 			return err
 		}
 	}
+	classifier := newClassifier(cfg, queries, log)
 	queue, err := jobs.New(jobs.Options{
 		Pool:       pool,
 		Queries:    queries,
-		Classifier: newClassifier(cfg, queries, log),
+		Classifier: classifier,
 		Logger:     log,
 		RunWorkers: cfg.RunWorkers,
 	})
@@ -87,16 +89,30 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("start workers: %w", err)
 	}
 
+	// The MCP endpoint (and its OAuth metadata) lives next to the app's API.
+	mcpOpts := mcpserver.Options{
+		Queries: queries, Verifier: verifier, Enqueuer: queue, Logger: log,
+		PublicURL: cfg.PublicURL, AuthServer: cfg.Issuer(),
+	}
+	if classifier.Embed != nil {
+		mcpOpts.Embed = classifier.Embed
+	}
+	mcpHandler := mcpserver.New(mcpOpts).Handler()
+	root := http.NewServeMux()
+	root.Handle(mcpserver.Path, mcpHandler)
+	root.Handle("/.well-known/", mcpHandler)
+	root.Handle("/", api.New(api.Options{
+		Queries:     queries,
+		Logger:      log,
+		Verifier:    verifier,
+		Ping:        pool.Ping,
+		CORSOrigins: cfg.CORSOrigins,
+		Enqueuer:    queue,
+	}).Handler())
+
 	srv := &http.Server{
-		Addr: cfg.Addr,
-		Handler: api.New(api.Options{
-			Queries:     queries,
-			Logger:      log,
-			Verifier:    verifier,
-			Ping:        pool.Ping,
-			CORSOrigins: cfg.CORSOrigins,
-			Enqueuer:    queue,
-		}).Handler(),
+		Addr:              cfg.Addr,
+		Handler:           root,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

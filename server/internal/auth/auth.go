@@ -58,15 +58,22 @@ func NewHS256(secret []byte, issuer string) *Verifier {
 
 // UserID validates a raw token and returns the user id in its "sub" claim.
 func (v *Verifier) UserID(raw string) (uuid.UUID, error) {
+	id, _, err := v.Verify(raw)
+	return id, err
+}
+
+// Verify validates a raw token and returns its user id and expiry. Tokens
+// Supabase issues to OAuth clients (MCP connectors) pass the same checks.
+func (v *Verifier) Verify(raw string) (uuid.UUID, time.Time, error) {
 	var claims jwt.RegisteredClaims
 	if _, err := v.parser.ParseWithClaims(raw, &claims, v.keyfunc); err != nil {
-		return uuid.Nil, fmt.Errorf("%w: %v", ErrUnauthorized, err)
+		return uuid.Nil, time.Time{}, fmt.Errorf("%w: %v", ErrUnauthorized, err)
 	}
 	id, err := uuid.Parse(claims.Subject)
 	if err != nil || id == uuid.Nil {
-		return uuid.Nil, fmt.Errorf("%w: token has no user", ErrUnauthorized)
+		return uuid.Nil, time.Time{}, fmt.Errorf("%w: token has no user", ErrUnauthorized)
 	}
-	return id, nil
+	return id, claims.ExpiresAt.Time, nil
 }
 
 type ctxKey struct{}

@@ -1,6 +1,6 @@
 // Email one-time code sign-in. A code (not a magic link) keeps it inside the
 // app with no deep-link setup.
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 
@@ -8,7 +8,11 @@ import { isConfigured } from '../lib/config';
 import { supabase } from '../lib/supabase';
 import { Button, Field, HudLabel, Panel, Text } from '../ui/module01';
 
+// Only same-app paths, so a crafted link can't send people elsewhere.
+const safeNext = (next?: string) => (next && next.startsWith('/') && !next.startsWith('//') ? next : '/');
+
 export default function SignIn() {
+  const { next } = useLocalSearchParams<{ next?: string }>();
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'email' | 'code'>('email');
@@ -30,7 +34,7 @@ export default function SignIn() {
     const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'email' });
     setBusy(false);
     if (error) return setError(error.message);
-    router.replace('/');
+    router.replace(safeNext(next) as never);
   }
 
   return (

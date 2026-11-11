@@ -42,6 +42,11 @@ type Querier interface {
 	// Newest first, paged with a (created_at, id) cursor.
 	ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error)
 	MarkClassified(ctx context.Context, arg MarkClassifiedParams) (int64, error)
+	// Fallback when embeddings aren't available: items whose description, URL
+	// or category contain the most query words.
+	SearchItemsByText(ctx context.Context, arg SearchItemsByTextParams) ([]SearchItemsByTextRow, error)
+	// Nearest items to a query embedding (cosine), optionally in one category.
+	SearchItemsByVector(ctx context.Context, arg SearchItemsByVectorParams) ([]SearchItemsByVectorRow, error)
 	// The user picked a category: the classifier won't change it again.
 	SetItemCategoryByUser(ctx context.Context, arg SetItemCategoryByUserParams) (SetItemCategoryByUserRow, error)
 	SetItemDescription(ctx context.Context, arg SetItemDescriptionParams) (bool, error)

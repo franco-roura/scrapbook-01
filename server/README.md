@@ -1,6 +1,6 @@
 # Scrapbook/01 API (Go)
 
-The Go API behind Scrapbook/01. Signed-in users save shared links with an optional "What is it about?" description (Phase 1). A background job then files each described item into a category and links it to similar items (Phase 3), which the app draws as a graph (Phase 4). MCP comes next.
+The Go API behind Scrapbook/01. Signed-in users save shared links with an optional "What is it about?" description (Phase 1). A background job then files each described item into a category and links it to similar items (Phase 3), which the app draws as a graph (Phase 4). Users' own AI assistants can search the library over MCP (Phase 5).
 
 ## How items get a category
 
@@ -48,6 +48,26 @@ Items include `category`, `categorySource` (`auto` or `user`) and `classifying` 
 
 Errors look like `{"error": {"code": "invalid_url", "message": "..."}}`.
 
+## MCP: the library in Claude, ChatGPT and other assistants
+
+`/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server (official Go SDK, Streamable HTTP, stateless). The assistant's reasoning runs on the user's own plan; this server only does retrieval, so a search costs one query embedding at most.
+
+| Tool | What it does |
+|---|---|
+| `search_library` | Semantic search (query embedding + pgvector) over the user's items, optionally in one category. Falls back to keyword matching when embeddings are off |
+| `get_item` | One item with its full note and its most similar items |
+| `get_neighbors` | Items linked to an item in the graph, 1 or 2 hops out, and their categories |
+| `save_item` | Saves a link with a note; it's sorted like any other save |
+
+**Sign-in is OAuth 2.1 through Supabase Auth.** The server publishes protected-resource metadata at `/.well-known/oauth-protected-resource/mcp` naming `<SUPABASE_URL>/auth/v1` as the authorization server, answers unauthenticated calls with `401` + `WWW-Authenticate: Bearer resource_metadata=...`, and accepts the access tokens Supabase issues to MCP clients (same issuer and audience as the app's tokens). One-time setup in the Supabase dashboard:
+
+1. Authentication → OAuth Server: turn it on, allow dynamic client registration (MCP clients register themselves), and set the authorization path to `/oauth/consent`.
+2. Authentication → URL Configuration: Site URL = where the app's web build is hosted. The consent screen is `apps/mobile/src/app/oauth/consent.tsx`.
+3. Use asymmetric JWT signing keys (RS256/ES256), as Supabase recommends for OAuth, and leave `SUPABASE_JWT_SECRET` empty so tokens are checked against the JWKS.
+4. Set `PUBLIC_URL` to the API's public origin.
+
+Then in Claude: Settings → Connectors → Add custom connector → `https://<api host>/mcp`.
+
 ## Run the whole flow without API keys
 
 `cmd/fakeai` imitates Jev, the embeddings API and Claude with crude word matching, for local development only:
@@ -63,7 +83,7 @@ TYPESAFE_API_KEY=dev TYPESAFE_BASE_URL=http://127.0.0.1:8787 EMBEDDINGS_API_KEY=
 - `db/migrations`: goose SQL migrations, embedded into the binary.
 - `db/queries`: SQL for sqlc. Generated Go code is in `internal/db` (don't edit it).
 - `internal/api`: handlers. `internal/auth`: token checks. `internal/links`: URL cleanup and platform detection.
-- `internal/graph`: builds graph and neighborhood responses.
+- `internal/graph`: builds graph and neighborhood responses. `internal/mcpserver`: the MCP tools and their OAuth wiring.
 - `internal/classify`: the sorting pipeline. `internal/ai`: Jev, embeddings and Claude clients. `internal/jobs`: River setup. `internal/push`: Expo notifications.
 
 ## Regenerate queries
@@ -81,7 +101,7 @@ On macOS or Linux, use `"$(pwd)"` instead of `"$(pwd -W)"` and drop `MSYS_NO_PAT
 ```bash
 go test ./...
 TEST_DATABASE_URL='postgres://scrapbook:scrapbook@localhost:54329/scrapbook?sslmode=disable' \
-  go test -tags integration -p 1 ./internal/db/ ./internal/classify/
+  go test -tags integration -p 1 ./internal/db/ ./internal/classify/ ./internal/mcpserver/
 ```
 
 The integration tests reset the schema, so point them at a disposable database.
