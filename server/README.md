@@ -65,7 +65,7 @@ Typical costs at list prices: about $0.000014 to sort a save into an existing ca
 
 | Tool | What it does |
 |---|---|
-| `search_library` | Semantic search (query embedding + pgvector) over the user's items, optionally in one category. Falls back to keyword matching when embeddings are off |
+| `search_library` | Semantic search (query embedding + pgvector) over the user's items, optionally in one category. With a Jev key, Jev re-ranks up to 10 candidates by how well they match the query (if Jev fails, the vector order stands). Falls back to keyword matching when embeddings are off |
 | `get_item` | One item with its full note and its most similar items |
 | `get_neighbors` | Items linked to an item in the graph, 1 or 2 hops out, and their categories |
 | `save_item` | Saves a link with a note; it's sorted like any other save |

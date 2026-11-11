@@ -100,6 +100,9 @@ func run(log *slog.Logger) error {
 	if classifier.Embed != nil {
 		mcpOpts.Embed = classifier.Embed
 	}
+	if classifier.Jev != nil { // only with TYPESAFE_API_KEY set
+		mcpOpts.Rerank = classifier.Jev
+	}
 	mcpHandler := mcpserver.New(mcpOpts).Handler()
 	root := http.NewServeMux()
 	root.Handle(mcpserver.Path, mcpHandler)

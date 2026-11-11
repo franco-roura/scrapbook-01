@@ -9,6 +9,7 @@ package mcpserver_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"hash/fnv"
 	"io"
 	"log/slog"
@@ -91,7 +92,7 @@ type fixture struct {
 	logger *slog.Logger
 }
 
-func setup(t *testing.T, embed mcpserver.Embedder) *fixture {
+func setup(t *testing.T, embed mcpserver.Embedder, tweaks ...func(*mcpserver.Options)) *fixture {
 	t.Helper()
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
@@ -152,10 +153,14 @@ func setup(t *testing.T, embed mcpserver.Embedder) *fixture {
 		t.Fatal(err)
 	}
 
-	s := mcpserver.New(mcpserver.Options{
+	opts := mcpserver.Options{
 		Queries: q, Verifier: auth.NewHS256(secret, issuer), Embed: embed, Logger: f.logger,
 		PublicURL: "https://api.example.test", AuthServer: issuer,
-	})
+	}
+	for _, tw := range tweaks {
+		tw(&opts)
+	}
+	s := mcpserver.New(opts)
 	f.srv = httptest.NewServer(s.Handler())
 	t.Cleanup(f.srv.Close)
 	return f
@@ -304,5 +309,47 @@ func TestKeywordFallback(t *testing.T) {
 	none, _ := call[struct{ Results []struct{ ID string } }](t, cs, "search_library", map[string]any{"query": "100%_"})
 	if len(none.Results) != 0 {
 		t.Fatalf("wildcards weren't escaped: %+v", none)
+	}
+}
+
+// preferring is a fake Jev that puts all probability on the option whose
+// text contains word.
+type preferring struct {
+	word string
+	fail bool
+}
+
+func (p preferring) Choose(_ context.Context, _, _ string, options map[string]string) (ai.Choice, error) {
+	if p.fail {
+		return ai.Choice{}, errors.New("jev down")
+	}
+	c := ai.Choice{Probabilities: map[string]float64{}}
+	for label, text := range options {
+		if strings.Contains(text, p.word) {
+			c.Label, c.Confidence, c.Probabilities[label] = label, 0.9, 0.9
+		} else {
+			c.Probabilities[label] = 0.1 / float64(len(options))
+		}
+	}
+	return c, nil
+}
+
+func TestRerank(t *testing.T) {
+	type out struct {
+		Results []struct{ ID string }
+		Mode    string
+	}
+	args := map[string]any{"query": "lemon pasta recipe", "limit": 2}
+
+	f := setup(t, bagOfWords{}, func(o *mcpserver.Options) { o.Rerank = preferring{word: "cake"} })
+	got, _ := call[out](t, f.connect(t, f.user), "search_library", args)
+	if got.Mode != "semantic+rerank" || len(got.Results) != 2 || got.Results[0].ID != f.ids["cake"].String() || got.Results[1].ID != f.ids["pasta"].String() {
+		t.Fatalf("reranked: %+v (cake %s, pasta %s)", got, f.ids["cake"], f.ids["pasta"])
+	}
+
+	f = setup(t, bagOfWords{}, func(o *mcpserver.Options) { o.Rerank = preferring{fail: true} })
+	got, _ = call[out](t, f.connect(t, f.user), "search_library", args)
+	if got.Mode != "semantic" || len(got.Results) != 2 || got.Results[0].ID != f.ids["pasta"].String() {
+		t.Fatalf("rerank failure should keep vector order: %+v", got)
 	}
 }

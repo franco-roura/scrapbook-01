@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -41,6 +43,11 @@ type Embedder interface {
 	Embed(ctx context.Context, inputs ...string) ([][]float32, error)
 }
 
+// Reranker picks among labeled options; *ai.Jev implements it.
+type Reranker interface {
+	Choose(ctx context.Context, state, instructions string, options map[string]string) (ai.Choice, error)
+}
+
 type Enqueuer interface {
 	EnqueueClassify(ctx context.Context, itemID uuid.UUID) error
 }
@@ -50,6 +57,9 @@ type Options struct {
 	Verifier *auth.Verifier
 	Embed    Embedder // optional: without it, search matches keywords
 	Enqueuer Enqueuer // optional: classification after save_item
+	// Rerank, when set (Jev), reorders semantic results by how well each
+	// matches the query. Optional.
+	Rerank Reranker
 	// Credits, when set: semantic search is charged to the user, and users
 	// out of credits get keyword search (free) instead.
 	Credits *credits.Ledger
@@ -142,7 +152,7 @@ type SearchInput struct {
 
 type SearchOutput struct {
 	Results []Result `json:"results"`
-	Mode    string   `json:"mode" jsonschema:"semantic or keyword"`
+	Mode    string   `json:"mode" jsonschema:"semantic, semantic+rerank or keyword"`
 }
 
 type ItemInput struct {
@@ -242,8 +252,13 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in Search
 	if semantic {
 		vecs, err := s.o.Embed.Embed(ctx, q)
 		if err == nil {
+			// With a re-ranker, fetch extra candidates for it to choose from.
+			fetch := limit
+			if s.o.Rerank != nil {
+				fetch = min(limit*2, 10)
+			}
 			rows, err := s.o.Queries.SearchItemsByVector(ctx, db.SearchItemsByVectorParams{
-				UserID: user, Embedding: ai.VectorLiteral(vecs[0]), Category: category, Lim: int32(limit),
+				UserID: user, Embedding: ai.VectorLiteral(vecs[0]), Category: category, Lim: int32(fetch),
 			})
 			if err != nil {
 				return nil, out, err
@@ -251,6 +266,16 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in Search
 			out.Mode = "semantic"
 			for _, r := range rows {
 				out.Results = append(out.Results, result(r.ID, r.Url, r.Platform, r.Description, r.CategoryName, r.CreatedAt, r.Score))
+			}
+			if s.o.Rerank != nil && len(out.Results) > 1 {
+				if reordered, err := s.rerank(ctx, q, out.Results); err == nil {
+					out.Results, out.Mode = reordered, "semantic+rerank"
+				} else {
+					s.o.Logger.WarnContext(ctx, "mcp search: rerank failed, keeping vector order", "err", err)
+				}
+			}
+			if len(out.Results) > limit {
+				out.Results = out.Results[:limit]
 			}
 			return nil, out, nil
 		}
@@ -395,6 +420,45 @@ func (s *Server) save(ctx context.Context, req *mcp.CallToolRequest, in SaveInpu
 		}
 	}
 	return nil, SaveOutput{ID: row.ID.String(), URL: norm, Created: row.Inserted}, nil
+}
+
+const rerankInstructions = "Which saved item best matches what the user is looking for?"
+
+// rerank asks Jev to choose among the candidates and orders them by its
+// probabilities (ties keep the vector order).
+func (s *Server) rerank(ctx context.Context, query string, cands []Result) ([]Result, error) {
+	options := make(map[string]string, len(cands))
+	for i, c := range cands {
+		desc := c.Title
+		if c.Category != "" {
+			desc += " (" + c.Category + ")"
+		}
+		options[strconv.Itoa(i+1)] = desc
+	}
+	choice, err := s.o.Rerank.Choose(ctx, query, rerankInstructions, options)
+	if err != nil {
+		return nil, err
+	}
+	prob := func(i int) float64 {
+		label := strconv.Itoa(i + 1)
+		if p, ok := choice.Probabilities[label]; ok {
+			return p
+		}
+		if label == choice.Label {
+			return choice.Confidence
+		}
+		return 0
+	}
+	idx := make([]int, len(cands))
+	for i := range idx {
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(a, b int) bool { return prob(idx[a]) > prob(idx[b]) })
+	out := make([]Result, len(cands))
+	for i, j := range idx {
+		out[i] = cands[j]
+	}
+	return out, nil
 }
 
 func result(id uuid.UUID, url, platform string, desc, category *string, saved time.Time, score float64) Result {
