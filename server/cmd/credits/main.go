@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/aaugoustis/waitlist/server/internal/auth"
 	"github.com/aaugoustis/waitlist/server/internal/credits"
 	"github.com/aaugoustis/waitlist/server/internal/db"
 )
@@ -32,11 +33,11 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: credits balance|grant|purchase -user <uuid> [...]")
+		return fmt.Errorf("usage: credits balance|grant|purchase -user <user_... or uuid> [...]")
 	}
 	cmd := args[0]
 	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
-	userFlag := fs.String("user", "", "user id (Supabase auth user)")
+	userFlag := fs.String("user", "", "WorkOS user id (user_...) or our user uuid")
 	usd := fs.Float64("usd", 0, "grant: model budget to add, in dollars")
 	note := fs.String("note", "", "grant: why")
 	price := fs.Float64("price", 0, "purchase: price paid, in dollars")
@@ -45,9 +46,9 @@ func run(args []string) error {
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
-	user, err := uuid.Parse(*userFlag)
-	if err != nil {
-		return fmt.Errorf("-user must be a UUID")
+	user := auth.UserIDFor(*userFlag)
+	if user == uuid.Nil {
+		return fmt.Errorf("-user is required")
 	}
 
 	ctx := context.Background()

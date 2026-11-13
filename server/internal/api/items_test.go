@@ -215,7 +215,7 @@ func (f *fakeQueries) ListCategories(context.Context, uuid.UUID) ([]db.ListCateg
 	return nil, nil
 }
 
-const testIssuer = "https://test.supabase.co/auth/v1"
+const testIssuer = "https://test.authkit.app"
 
 var testSecret = []byte("test-secret-at-least-32-bytes-long!!")
 
@@ -231,7 +231,7 @@ func newHarness(t *testing.T) *harness {
 	s := New(Options{
 		Queries:     q,
 		Logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Verifier:    auth.NewHS256(testSecret, testIssuer),
+		Verifier:    auth.NewHS256(testSecret, testIssuer, "https://api.example.test/mcp"),
 		CORSOrigins: []string{"http://localhost:8081"},
 		Enqueuer:    enq,
 	})
@@ -242,7 +242,7 @@ func newHarness(t *testing.T) *harness {
 
 func token(t *testing.T, user uuid.UUID) string {
 	s, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Subject: user.String(), Issuer: testIssuer, Audience: jwt.ClaimStrings{"authenticated"},
+		Subject: user.String(), Issuer: testIssuer, Audience: jwt.ClaimStrings{"https://api.example.test/mcp"},
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
 	}).SignedString(testSecret)
 	if err != nil {
@@ -575,7 +575,7 @@ func TestCredits(t *testing.T) {
 	q := newFake()
 	s := New(Options{
 		Queries: q, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Verifier: auth.NewHS256(testSecret, testIssuer),
+		Verifier: auth.NewHS256(testSecret, testIssuer, "https://api.example.test/mcp"),
 		Credits:  &credits.Ledger{Q: q, Starter: 90_000},
 	})
 	srv := httptest.NewServer(s.Handler())
@@ -616,7 +616,7 @@ func TestWaitingForCredits(t *testing.T) {
 	q := newFake()
 	s := New(Options{
 		Queries: q, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Verifier: auth.NewHS256(testSecret, testIssuer),
+		Verifier: auth.NewHS256(testSecret, testIssuer, "https://api.example.test/mcp"),
 		Credits:  &credits.Ledger{Q: q, Starter: 100},
 	})
 	srv := httptest.NewServer(s.Handler())

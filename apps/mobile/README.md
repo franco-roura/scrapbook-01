@@ -2,12 +2,13 @@
 
 Phase 2 of the app plan: the React Native app and the "What is it about?" share sheet. It talks to the Go API in `../../server`.
 
-- **iOS:** sharing to Scrapbook/01 opens a small sheet on top of the other app (`expo-share-extension`, entry `index.share.js`). The sheet is signed in because the Supabase session is kept in the keychain under the app group `group.com.scrapbook01.app`, which the app and the extension share.
+- **iOS:** sharing to Scrapbook/01 opens a small sheet on top of the other app (`expo-share-extension`, entry `index.share.js`). The sheet is signed in because the session is kept in the keychain under the app group `group.com.scrapbook01.app`, which the app and the extension share. The extension refreshes the token itself with one HTTP call (`src/lib/session.ts`) and never loads the sign-in code.
 - **Android:** sharing opens the app on the same sheet (`expo-share-intent`, `src/share/AndroidShareListener.tsx` → `src/app/share.tsx`).
-- **In the app:** library (newest first), the "Undescribed" inbox, item screen (describe, open, delete, change category), "Add link", email-code sign-in and sign-out.
+- **In the app:** library (newest first), the "Undescribed" inbox, item screen (describe, open, delete, change category), "Add link", sign-in and sign-out.
+- **Sign-in:** WorkOS AuthKit's hosted page, opened in a browser sheet (`src/lib/signIn.ts`, OAuth code flow with PKCE, no secret in the app). People get a 6-digit code by email, sent by WorkOS. Tokens last a few minutes and are refreshed when the API needs one; refresh tokens are single use, so the app and share extension re-read the shared session before refreshing.
 - **Categories (Phase 3):** the server sorts each described item. Rows show "Sorting…" until it's done, and the item screen lets you move it (which stops automatic sorting for that item).
 - **Graph (Phase 4):** "Graph" on the library opens the whole library as a force-directed graph: category hubs in Module/01's category colors, items around them, similar items linked. Tap a node to focus it (rings, crosshair, neighbors highlighted, the rest dimmed). Each item screen shows its connections 1 or 2 hops out; tapping a neighbor swaps the screen to it while the graph keeps its layout. Drawn with `react-force-graph-2d` in an Expo DOM component (`src/graph/GraphCanvas.tsx`), which runs in a web view on phones, with colors from `@franco_roura/module-01`'s `tokens.json`.
-- **Connecting an assistant (Phase 5):** `src/app/oauth/consent.tsx` is the page Supabase's OAuth server sends people to when they add Scrapbook/01 to Claude or ChatGPT. It needs the web build hosted at the Supabase Site URL. Signed-out visitors go through sign-in and come back.
+- **Connecting an assistant (Phase 5):** AuthKit shows the sign-in and "Allow access?" screens when someone adds Scrapbook/01 to Claude or ChatGPT, so the app has no page for it.
 - **Credits (Phase 6):** "Credits" in the library header shows the model budget left, roughly how many saves it covers, how the 80/20 split works, and recent activity. Buying packs isn't wired to a payment provider yet (the button says "coming soon").
 - **Notifications:** after sign-in the app registers its Expo push token, and the server sends "Saved to *category*". Tapping it opens the item. This needs an EAS project id (`bun x eas-cli init`) and a development build.
 
@@ -16,13 +17,15 @@ The UI follows Module/01. Its web components can't run in React Native, so `src/
 ## Run
 
 ```bash
-cp .env.example .env.local   # API URL + Supabase URL and publishable key
+cp .env.example .env.local   # API URL + WorkOS client id
 bun install
 bun run web                  # quickest check, in a browser
 bun run android              # needs Android Studio / an emulator or device
 ```
 
-The share sheet needs a development build, not Expo Go: `bun x eas-cli build --profile development`. iOS builds need macOS or EAS. For the web build, set `CORS_ORIGINS=http://localhost:8081` on the API.
+The share sheet needs a development build, not Expo Go: `bun x eas-cli build --profile development`. iOS builds need macOS or EAS. For the web build, set `CORS_ORIGINS=http://localhost:8081` on the API, and add the web origin to WorkOS's CORS allow list (Authentication → Sessions → Configure CORS), since the browser calls WorkOS directly.
+
+In the WorkOS dashboard (Redirects), add the redirect URIs: `scrapbook01://auth/callback` for the phone builds and `http://localhost:8081/auth/callback` (sandbox) or your web origin's `/auth/callback` for the web build.
 
 ## Checks
 

@@ -1,5 +1,5 @@
-// Package auth checks Supabase Auth access tokens and puts the signed-in
-// user's id on the request context.
+// Package auth checks access tokens (WorkOS AuthKit by default) and puts the
+// signed-in user's id on the request context.
 package auth
 
 import (
@@ -15,65 +15,127 @@ import (
 	"github.com/google/uuid"
 )
 
-// audience is the "aud" claim Supabase sets on signed-in users' tokens.
-const audience = "authenticated"
-
 var ErrUnauthorized = errors.New("unauthorized")
 
-// Verifier validates access tokens.
+// DevIssuer is the "iss" of tokens signed with DEV_JWT_SECRET (local only).
+const DevIssuer = "scrapbook01-dev"
+
+// Issuer is one token issuer the API trusts.
+type Issuer struct {
+	// Issuer is the exact "iss" claim.
+	Issuer string
+	// Keyfunc returns the key that checks a token's signature.
+	Keyfunc jwt.Keyfunc
+	// Methods are the accepted signing algorithms.
+	Methods []string
+	// Audiences, when set, require "aud" to contain at least one of them.
+	Audiences []string
+}
+
+// Verifier validates access tokens from any of its trusted issuers.
 type Verifier struct {
-	keyfunc jwt.Keyfunc
-	parser  *jwt.Parser
+	issuers map[string]*jwt.Parser
+	keys    map[string]jwt.Keyfunc
 }
 
-// New builds a Verifier from a key lookup function and the signing methods it
-// accepts. Most callers want NewJWKS or NewHS256.
-func New(kf jwt.Keyfunc, methods []string, issuer string) *Verifier {
-	return &Verifier{
-		keyfunc: kf,
-		parser: jwt.NewParser(
-			jwt.WithValidMethods(methods),
-			jwt.WithIssuer(issuer),
-			jwt.WithAudience(audience),
+// New builds a Verifier that trusts the given issuers.
+func New(issuers ...Issuer) *Verifier {
+	v := &Verifier{issuers: map[string]*jwt.Parser{}, keys: map[string]jwt.Keyfunc{}}
+	for _, is := range issuers {
+		opts := []jwt.ParserOption{
+			jwt.WithValidMethods(is.Methods),
+			jwt.WithIssuer(is.Issuer),
 			jwt.WithExpirationRequired(),
-			jwt.WithLeeway(30*time.Second),
-		),
+			jwt.WithLeeway(30 * time.Second),
+		}
+		if len(is.Audiences) > 0 {
+			opts = append(opts, jwt.WithAudience(is.Audiences...))
+		}
+		v.issuers[is.Issuer] = jwt.NewParser(opts...)
+		v.keys[is.Issuer] = is.Keyfunc
 	}
+	return v
 }
 
-// NewJWKS verifies tokens signed with the project's asymmetric signing keys,
-// fetched (and refreshed in the background) from jwksURL.
-func NewJWKS(ctx context.Context, jwksURL, issuer string) (*Verifier, error) {
-	k, err := keyfunc.NewDefaultCtx(ctx, []string{jwksURL})
+// JWKS returns a key lookup backed by a JWKS endpoint (fetched now, then
+// refreshed in the background).
+func JWKS(ctx context.Context, url string) (jwt.Keyfunc, error) {
+	k, err := keyfunc.NewDefaultCtx(ctx, []string{url})
 	if err != nil {
-		return nil, fmt.Errorf("auth: load JWKS: %w", err)
+		return nil, fmt.Errorf("auth: load JWKS %s: %w", url, err)
 	}
-	return New(k.Keyfunc, []string{"ES256", "RS256", "EdDSA"}, issuer), nil
+	return k.Keyfunc, nil
 }
 
-// NewHS256 verifies tokens signed with the legacy shared JWT secret.
-func NewHS256(secret []byte, issuer string) *Verifier {
-	return New(func(*jwt.Token) (any, error) { return secret, nil }, []string{"HS256"}, issuer)
+// Asymmetric are the algorithms accepted for JWKS-backed issuers.
+var Asymmetric = []string{"RS256", "ES256", "EdDSA"}
+
+// NewHS256 trusts one issuer signing with a shared secret. Tests use it.
+func NewHS256(secret []byte, issuer string, audiences ...string) *Verifier {
+	return New(Issuer{
+		Issuer:    issuer,
+		Keyfunc:   func(*jwt.Token) (any, error) { return secret, nil },
+		Methods:   []string{"HS256"},
+		Audiences: audiences,
+	})
 }
 
-// UserID validates a raw token and returns the user id in its "sub" claim.
+// UserID validates a raw token and returns the user it belongs to.
 func (v *Verifier) UserID(raw string) (uuid.UUID, error) {
 	id, _, err := v.Verify(raw)
 	return id, err
 }
 
-// Verify validates a raw token and returns its user id and expiry. Tokens
-// Supabase issues to OAuth clients (MCP connectors) pass the same checks.
+type tokenClaims struct {
+	jwt.RegisteredClaims
+	// SubProfile is "ai_agent" on WorkOS agent tokens, which act for no user.
+	SubProfile string `json:"sub_profile,omitempty"`
+}
+
+// Verify validates a raw token and returns its user id and expiry.
 func (v *Verifier) Verify(raw string) (uuid.UUID, time.Time, error) {
-	var claims jwt.RegisteredClaims
-	if _, err := v.parser.ParseWithClaims(raw, &claims, v.keyfunc); err != nil {
-		return uuid.Nil, time.Time{}, fmt.Errorf("%w: %v", ErrUnauthorized, err)
+	fail := func(format string, a ...any) (uuid.UUID, time.Time, error) {
+		return uuid.Nil, time.Time{}, fmt.Errorf("%w: %s", ErrUnauthorized, fmt.Sprintf(format, a...))
 	}
-	id, err := uuid.Parse(claims.Subject)
-	if err != nil || id == uuid.Nil {
-		return uuid.Nil, time.Time{}, fmt.Errorf("%w: token has no user", ErrUnauthorized)
+	// Read "iss" first to pick the issuer's checks; the signature and every
+	// claim are then verified by that issuer's parser.
+	var peek jwt.RegisteredClaims
+	if _, _, err := jwt.NewParser().ParseUnverified(raw, &peek); err != nil {
+		return fail("%v", err)
 	}
-	return id, claims.ExpiresAt.Time, nil
+	parser, ok := v.issuers[peek.Issuer]
+	if !ok {
+		return fail("untrusted issuer %q", peek.Issuer)
+	}
+	var c tokenClaims
+	if _, err := parser.ParseWithClaims(raw, &c, v.keys[peek.Issuer]); err != nil {
+		return fail("%v", err)
+	}
+	if c.SubProfile == "ai_agent" {
+		return fail("agent tokens are not accepted")
+	}
+	id := UserIDFor(c.Subject)
+	if id == uuid.Nil {
+		return fail("token has no user")
+	}
+	return id, c.ExpiresAt.Time, nil
+}
+
+// namespace makes user ids from identity-provider subjects.
+var namespace = uuid.MustParse("6f1c2b8e-3d7a-4f0e-9b65-2a4c8d1e7f30")
+
+// UserIDFor maps an identity provider's user id ("sub") to the uuid the
+// database uses. A uuid subject is used as is; anything else (WorkOS's
+// "user_01H...") becomes a stable name-based uuid, so no lookup table is
+// needed and the app and MCP tokens for one person map to the same user.
+func UserIDFor(sub string) uuid.UUID {
+	if sub == "" {
+		return uuid.Nil
+	}
+	if id, err := uuid.Parse(sub); err == nil {
+		return id
+	}
+	return uuid.NewSHA1(namespace, []byte(sub))
 }
 
 type ctxKey struct{}

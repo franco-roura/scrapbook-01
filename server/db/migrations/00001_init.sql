@@ -1,6 +1,6 @@
 -- +goose Up
--- user_id holds the Supabase Auth user id (the token's "sub"). There is no
--- foreign key to auth.users so the same schema runs on plain Postgres locally.
+-- user_id identifies the signed-in person. It's derived from the identity
+-- provider's user id (auth.UserIDFor), so there is no users table.
 
 CREATE TABLE categories (
     id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),

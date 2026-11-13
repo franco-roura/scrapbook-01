@@ -14,7 +14,9 @@ import (
 	"github.com/google/uuid"
 )
 
-const issuer = "https://test.supabase.co/auth/v1"
+const issuer = "https://test.authkit.app"
+
+const audience = "https://api.example.test/mcp"
 
 var secret = []byte("test-secret-at-least-32-bytes-long!!")
 
@@ -41,7 +43,7 @@ func hs256(t *testing.T, c jwt.RegisteredClaims) string {
 }
 
 func TestHS256(t *testing.T) {
-	v := NewHS256(secret, issuer)
+	v := NewHS256(secret, issuer, audience)
 	user := uuid.New()
 
 	got, err := v.UserID(hs256(t, claims(user.String(), nil)))
@@ -50,13 +52,12 @@ func TestHS256(t *testing.T) {
 	}
 
 	bad := map[string]string{
-		"expired":       hs256(t, claims(user.String(), func(c *jwt.RegisteredClaims) { c.ExpiresAt = jwt.NewNumericDate(time.Now().Add(-time.Hour)) })),
-		"no expiry":     hs256(t, claims(user.String(), func(c *jwt.RegisteredClaims) { c.ExpiresAt = nil })),
-		"wrong issuer":  hs256(t, claims(user.String(), func(c *jwt.RegisteredClaims) { c.Issuer = "https://evil.example/auth/v1" })),
-		"anon audience": hs256(t, claims(user.String(), func(c *jwt.RegisteredClaims) { c.Audience = jwt.ClaimStrings{"anon"} })),
-		"no subject":    hs256(t, claims("", nil)),
-		"non-uuid sub":  hs256(t, claims("someone", nil)),
-		"garbage":       "not.a.token",
+		"expired":        hs256(t, claims(user.String(), func(c *jwt.RegisteredClaims) { c.ExpiresAt = jwt.NewNumericDate(time.Now().Add(-time.Hour)) })),
+		"no expiry":      hs256(t, claims(user.String(), func(c *jwt.RegisteredClaims) { c.ExpiresAt = nil })),
+		"wrong issuer":   hs256(t, claims(user.String(), func(c *jwt.RegisteredClaims) { c.Issuer = "https://evil.example/auth/v1" })),
+		"wrong audience": hs256(t, claims(user.String(), func(c *jwt.RegisteredClaims) { c.Audience = jwt.ClaimStrings{"anon"} })),
+		"no subject":     hs256(t, claims("", nil)),
+		"garbage":        "not.a.token",
 	}
 	other, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, claims(user.String(), nil)).SignedString([]byte("another-secret-another-secret-123"))
 	bad["wrong secret"] = other
@@ -73,7 +74,7 @@ func TestAsymmetricRejectsAlgSwitch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v := New(func(*jwt.Token) (any, error) { return &key.PublicKey, nil }, []string{"ES256"}, issuer)
+	v := New(Issuer{Issuer: issuer, Keyfunc: func(*jwt.Token) (any, error) { return &key.PublicKey, nil }, Methods: []string{"ES256"}})
 	user := uuid.New()
 
 	tok, _ := jwt.NewWithClaims(jwt.SigningMethodES256, claims(user.String(), nil)).SignedString(key)
@@ -87,7 +88,7 @@ func TestAsymmetricRejectsAlgSwitch(t *testing.T) {
 }
 
 func TestMiddleware(t *testing.T) {
-	v := NewHS256(secret, issuer)
+	v := NewHS256(secret, issuer, audience)
 	user := uuid.New()
 	var seen uuid.UUID
 	h := v.Middleware(func(w http.ResponseWriter, _ *http.Request, _ error) {
@@ -115,5 +116,40 @@ func TestMiddleware(t *testing.T) {
 		if want == http.StatusOK && seen != user {
 			t.Errorf("handler saw user %v, want %v", seen, user)
 		}
+	}
+}
+
+func TestWorkOSSubjectsMapToStableUUIDs(t *testing.T) {
+	v := NewHS256(secret, issuer, audience)
+	want := UserIDFor("user_01HBEQKA6K4QJAS93VPE39W1JT")
+	if want == uuid.Nil || want != UserIDFor("user_01HBEQKA6K4QJAS93VPE39W1JT") || want == UserIDFor("user_other") {
+		t.Fatal("UserIDFor must be stable and distinct")
+	}
+	got, err := v.UserID(hs256(t, claims("user_01HBEQKA6K4QJAS93VPE39W1JT", nil)))
+	if err != nil || got != want {
+		t.Fatalf("got %v, %v; want %v", got, err, want)
+	}
+}
+
+func TestTrustsSeveralIssuers(t *testing.T) {
+	key := func(*jwt.Token) (any, error) { return secret, nil }
+	v := New(
+		Issuer{Issuer: "https://api.workos.com", Keyfunc: key, Methods: []string{"HS256"}},
+		Issuer{Issuer: issuer, Keyfunc: key, Methods: []string{"HS256"}, Audiences: []string{audience}},
+	)
+	app := hs256(t, claims("user_a", func(c *jwt.RegisteredClaims) { c.Issuer = "https://api.workos.com"; c.Audience = nil }))
+	if _, err := v.UserID(app); err != nil {
+		t.Fatalf("app token without aud: %v", err)
+	}
+	mcpNoAud := hs256(t, claims("user_a", func(c *jwt.RegisteredClaims) { c.Audience = nil }))
+	if _, err := v.UserID(mcpNoAud); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("MCP token without aud: err = %v", err)
+	}
+	agent, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": "agent_1", "iss": issuer, "aud": audience, "sub_profile": "ai_agent",
+		"exp": time.Now().Add(time.Hour).Unix(),
+	}).SignedString(secret)
+	if _, err := v.UserID(agent); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("agent token: err = %v", err)
 	}
 }

@@ -35,13 +35,13 @@ import (
 	"github.com/aaugoustis/waitlist/server/internal/mcpserver"
 )
 
-const issuer = "https://test.supabase.co/auth/v1"
+const issuer = "https://test.authkit.app"
 
 var secret = []byte("test-secret-at-least-32-bytes-long!!")
 
 func token(t *testing.T, user uuid.UUID) string {
 	s, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": user.String(), "iss": issuer, "aud": "authenticated",
+		"sub": user.String(), "iss": issuer, "aud": "https://api.example.test/mcp",
 		"exp": time.Now().Add(time.Hour).Unix(), "client_id": "claude-connector",
 	}).SignedString(secret)
 	if err != nil {
@@ -154,7 +154,7 @@ func setup(t *testing.T, embed mcpserver.Embedder, tweaks ...func(*mcpserver.Opt
 	}
 
 	opts := mcpserver.Options{
-		Queries: q, Verifier: auth.NewHS256(secret, issuer), Embed: embed, Logger: f.logger,
+		Queries: q, Verifier: auth.NewHS256(secret, issuer, "https://api.example.test/mcp"), Embed: embed, Logger: f.logger,
 		PublicURL: "https://api.example.test", AuthServer: issuer,
 	}
 	for _, tw := range tweaks {

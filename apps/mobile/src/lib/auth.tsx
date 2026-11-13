@@ -1,30 +1,19 @@
-import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { AppState, Platform } from 'react-native';
 
-import { supabase } from './supabase';
+import { getSession, onSessionChange, type Session } from './session';
 
 type AuthState = { session: Session | null; loading: boolean };
 
 const AuthContext = createContext<AuthState>({ session: null, loading: true });
 
+// Tokens are refreshed on demand (when the API needs one), so there is no
+// background timer here.
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ session: null, loading: true });
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setState({ session: data.session, loading: false }));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => setState({ session, loading: false }));
-
-    // Refresh tokens only while the app is in the foreground (Supabase's
-    // recommendation for React Native).
-    const onChange = (s: string) =>
-      s === 'active' ? supabase.auth.startAutoRefresh() : supabase.auth.stopAutoRefresh();
-    const appState = Platform.OS === 'web' ? null : AppState.addEventListener('change', onChange);
-
-    return () => {
-      sub.subscription.unsubscribe();
-      appState?.remove();
-    };
+    getSession().then((session) => setState({ session, loading: false }));
+    return onSessionChange((session) => setState({ session, loading: false }));
   }, []);
 
   return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;

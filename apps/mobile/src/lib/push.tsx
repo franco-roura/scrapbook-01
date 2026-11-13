@@ -11,7 +11,7 @@ import { Platform } from 'react-native';
 
 import { useAuth } from './auth';
 import { api } from './client';
-import { supabase } from './supabase';
+import { signOutSession } from './session';
 
 const supported = Platform.OS !== 'web';
 
@@ -56,7 +56,7 @@ export async function signOut() {
     await api.unregisterDevice(registeredToken).catch(() => undefined);
     registeredToken = null;
   }
-  await supabase.auth.signOut();
+  await signOutSession();
 }
 
 /** Mount once inside AuthProvider. Renders nothing on web, which has no push. */

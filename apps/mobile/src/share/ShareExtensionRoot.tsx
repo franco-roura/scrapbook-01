@@ -4,14 +4,14 @@ import { close, openHostApp, type InitialProps } from 'expo-share-extension';
 import { useEffect, useState } from 'react';
 
 import { api } from '../lib/client';
-import { supabase } from '../lib/supabase';
+import { getSession } from '../lib/session';
 import { ShareSheet } from './ShareSheet';
 
 export default function ShareExtensionRoot({ url, text }: InitialProps) {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)));
+    getSession().then((s) => setSignedIn(Boolean(s)));
   }, []);
 
   if (signedIn === null) return null;

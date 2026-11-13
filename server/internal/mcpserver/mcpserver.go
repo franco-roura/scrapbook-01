@@ -4,9 +4,10 @@
 // embedding per search, or a keyword match when embeddings are off.
 //
 // Transport: Streamable HTTP, stateless (each request stands alone).
-// Auth: OAuth 2.1 with Supabase Auth as the authorization server. Clients
-// discover it from /.well-known/oauth-protected-resource (RFC 9728) and send
-// Supabase access tokens as bearer tokens.
+// Auth: OAuth 2.1 with WorkOS AuthKit as the authorization server. Clients
+// discover it from /.well-known/oauth-protected-resource (RFC 9728), register
+// with AuthKit (CIMD or dynamic registration), and send AuthKit access tokens
+// as bearer tokens.
 package mcpserver
 
 import (
@@ -66,7 +67,7 @@ type Options struct {
 	Logger  *slog.Logger
 	// PublicURL is the API's external origin, e.g. https://api.scrapbook01.app.
 	PublicURL string
-	// AuthServer is Supabase Auth's issuer, e.g. https://abc.supabase.co/auth/v1.
+	// AuthServer is the AuthKit domain, e.g. https://abc-123.authkit.app.
 	AuthServer string
 }
 
@@ -93,9 +94,13 @@ func New(o Options) *Server {
 // Handler serves the MCP endpoint and its OAuth metadata. Mount it at "/".
 func (s *Server) Handler() http.Handler {
 	resource := strings.TrimRight(s.o.PublicURL, "/") + Path
+	var servers []string // empty in local dev without WorkOS
+	if s.o.AuthServer != "" {
+		servers = []string{s.o.AuthServer}
+	}
 	meta := sdkauth.ProtectedResourceMetadataHandler(&oauthex.ProtectedResourceMetadata{
 		Resource:               resource,
-		AuthorizationServers:   []string{s.o.AuthServer},
+		AuthorizationServers:   servers,
 		BearerMethodsSupported: []string{"header"},
 		ResourceName:           "Scrapbook/01",
 	})

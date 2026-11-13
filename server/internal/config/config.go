@@ -18,12 +18,18 @@ type Config struct {
 	// MigrateOnStart applies pending migrations when the API boots.
 	MigrateOnStart bool
 
-	// SupabaseURL is the project URL, e.g. https://abc.supabase.co. The JWKS
-	// endpoint and the expected token issuer are derived from it.
-	SupabaseURL string
-	// SupabaseJWTSecret enables the legacy HS256 shared-secret check. When it is
-	// empty, tokens are verified against the project's JWKS instead.
-	SupabaseJWTSecret string
+	// WorkOSClientID is the WorkOS environment's client id (client_...). The
+	// app's session tokens are checked against its JWKS.
+	WorkOSClientID string
+	// WorkOSAPIURL is the WorkOS API origin, or your custom auth domain.
+	WorkOSAPIURL string
+	// AuthKitDomain is the AuthKit origin (e.g. https://abc-123.authkit.app).
+	// It issues the tokens MCP clients (Claude, ChatGPT) use.
+	AuthKitDomain string
+	// DevJWTSecret, for local development only, also accepts HS256 tokens
+	// with issuer "scrapbook01-dev" signed with this secret. When it's set,
+	// the WorkOS settings become optional.
+	DevJWTSecret string
 
 	// CORSOrigins lists browser origins allowed to call the API, from the
 	// comma-separated CORS_ORIGINS. Empty means no browser access.
@@ -67,12 +73,14 @@ type Config struct {
 
 func Load() (Config, error) {
 	c := Config{
-		Addr:              env("ADDR", ":8080"),
-		DatabaseURL:       os.Getenv("DATABASE_URL"),
-		MigrateOnStart:    env("MIGRATE_ON_START", "true") == "true",
-		SupabaseURL:       strings.TrimRight(os.Getenv("SUPABASE_URL"), "/"),
-		SupabaseJWTSecret: os.Getenv("SUPABASE_JWT_SECRET"),
-		ShutdownTimeout:   10 * time.Second,
+		Addr:            env("ADDR", ":8080"),
+		DatabaseURL:     os.Getenv("DATABASE_URL"),
+		MigrateOnStart:  env("MIGRATE_ON_START", "true") == "true",
+		WorkOSClientID:  os.Getenv("WORKOS_CLIENT_ID"),
+		WorkOSAPIURL:    strings.TrimRight(env("WORKOS_API_URL", "https://api.workos.com"), "/"),
+		AuthKitDomain:   strings.TrimRight(os.Getenv("WORKOS_AUTHKIT_DOMAIN"), "/"),
+		DevJWTSecret:    os.Getenv("DEV_JWT_SECRET"),
+		ShutdownTimeout: 10 * time.Second,
 
 		PublicURL:         strings.TrimRight(env("PUBLIC_URL", "http://localhost:8080"), "/"),
 		RunWorkers:        env("RUN_WORKERS", "true") == "true",
@@ -117,8 +125,13 @@ func Load() (Config, error) {
 	if c.DatabaseURL == "" {
 		errs = append(errs, errors.New("DATABASE_URL is required"))
 	}
-	if c.SupabaseURL == "" {
-		errs = append(errs, errors.New("SUPABASE_URL is required"))
+	if c.WorkOSClientID == "" && c.DevJWTSecret == "" {
+		errs = append(errs, errors.New("WORKOS_CLIENT_ID is required"))
+	}
+	if c.AuthKitDomain == "" && c.DevJWTSecret == "" {
+		errs = append(errs, errors.New("WORKOS_AUTHKIT_DOMAIN is required"))
+	} else if c.AuthKitDomain != "" && !strings.HasPrefix(c.AuthKitDomain, "https://") && !strings.HasPrefix(c.AuthKitDomain, "http://") {
+		c.AuthKitDomain = "https://" + c.AuthKitDomain
 	}
 	if err := errors.Join(errs...); err != nil {
 		return Config{}, fmt.Errorf("config: %w", err)
@@ -126,11 +139,18 @@ func Load() (Config, error) {
 	return c, nil
 }
 
-// Issuer is the "iss" claim Supabase Auth puts in its access tokens.
-func (c Config) Issuer() string { return c.SupabaseURL + "/auth/v1" }
+// WorkOSEnabled reports whether WorkOS tokens are accepted.
+func (c Config) WorkOSEnabled() bool { return c.WorkOSClientID != "" && c.AuthKitDomain != "" }
 
-// JWKSURL is where Supabase publishes the public keys for asymmetric tokens.
-func (c Config) JWKSURL() string { return c.SupabaseURL + "/auth/v1/.well-known/jwks.json" }
+// SessionJWKSURL publishes the keys for the app's AuthKit session tokens.
+func (c Config) SessionJWKSURL() string { return c.WorkOSAPIURL + "/sso/jwks/" + c.WorkOSClientID }
+
+// AuthKitJWKSURL publishes the keys for tokens AuthKit issues to MCP clients.
+func (c Config) AuthKitJWKSURL() string { return c.AuthKitDomain + "/oauth2/jwks" }
+
+// MCPResource is the MCP endpoint's URL: the "resource" MCP clients ask
+// AuthKit for, and the "aud" of the tokens they get.
+func (c Config) MCPResource() string { return c.PublicURL + "/mcp" }
 
 func env(key, fallback string) string {
 	if v, ok := os.LookupEnv(key); ok && v != "" {

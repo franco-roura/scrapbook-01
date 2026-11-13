@@ -18,12 +18,12 @@ Re-saving a link without a new description, or a category the user picked themse
 
 ```bash
 docker compose up -d --wait          # Postgres (pgvector image) on port 54329
-cp .env.example .env                 # then fill SUPABASE_URL
+cp .env.example .env                 # then fill the two WORKOS_ values
 set -a; . ./.env; set +a
 go run ./cmd/api                     # applies migrations on start
 ```
 
-Tokens are Supabase Auth access tokens (`Authorization: Bearer <token>`). By default they are checked against the project's JWKS. Set `SUPABASE_JWT_SECRET` to use the legacy HS256 secret instead.
+Sign-in is [WorkOS AuthKit](https://workos.com/docs/authkit). Requests carry an AuthKit access token (`Authorization: Bearer <token>`), checked against WorkOS's public keys. Two kinds are accepted: the app's session tokens (issuer: the WorkOS API) and the tokens AuthKit gives MCP clients (issuer: your AuthKit domain, audience: `<PUBLIC_URL>/mcp`). WorkOS user ids (`user_01H…`) become stable uuids (`auth.UserIDFor`, a name-based uuid), so the database needs no users table and both token kinds map to the same person.
 
 ## Endpoints
 
@@ -70,11 +70,11 @@ Typical costs at list prices: about $0.000014 to sort a save into an existing ca
 | `get_neighbors` | Items linked to an item in the graph, 1 or 2 hops out, and their categories |
 | `save_item` | Saves a link with a note; it's sorted like any other save |
 
-**Sign-in is OAuth 2.1 through Supabase Auth.** The server publishes protected-resource metadata at `/.well-known/oauth-protected-resource/mcp` naming `<SUPABASE_URL>/auth/v1` as the authorization server, answers unauthenticated calls with `401` + `WWW-Authenticate: Bearer resource_metadata=...`, and accepts the access tokens Supabase issues to MCP clients (same issuer and audience as the app's tokens). One-time setup in the Supabase dashboard:
+**Sign-in is OAuth 2.1 through WorkOS AuthKit.** The server publishes protected-resource metadata at `/.well-known/oauth-protected-resource/mcp` naming your AuthKit domain as the authorization server, and answers unauthenticated calls with `401` + `WWW-Authenticate: Bearer resource_metadata=...`. AuthKit shows the sign-in and "Allow access?" screens itself. One-time setup in the WorkOS dashboard:
 
-1. Authentication → OAuth Server: turn it on, allow dynamic client registration (MCP clients register themselves), and set the authorization path to `/oauth/consent`.
-2. Authentication → URL Configuration: Site URL = where the app's web build is hosted. The consent screen is `apps/mobile/src/app/oauth/consent.tsx`.
-3. Use asymmetric JWT signing keys (RS256/ES256), as Supabase recommends for OAuth, and leave `SUPABASE_JWT_SECRET` empty so tokens are checked against the JWKS.
+1. **Authentication**: turn on Magic Auth (email codes). WorkOS sends the emails, so there's no mail server to set up.
+2. **Connect → Configuration**: turn on Client ID Metadata Documents (the current MCP way for clients to register) and dynamic client registration (older clients still use it).
+3. **Resource Indicators**: add `<PUBLIC_URL>/mcp` and set it as the default, so tokens are issued for this server (their `aud`).
 4. Set `PUBLIC_URL` to the API's public origin.
 
 Then in Claude: Settings → Connectors → Add custom connector → `https://<api host>/mcp`.

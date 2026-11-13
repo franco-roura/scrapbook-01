@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -57,16 +58,9 @@ func run(log *slog.Logger) error {
 		}
 	}
 
-	var verifier *auth.Verifier
-	if cfg.SupabaseJWTSecret != "" {
-		verifier = auth.NewHS256([]byte(cfg.SupabaseJWTSecret), cfg.Issuer())
-		log.Info("auth: using legacy HS256 JWT secret")
-	} else {
-		verifier, err = auth.NewJWKS(ctx, cfg.JWKSURL(), cfg.Issuer())
-		if err != nil {
-			return err
-		}
-		log.Info("auth: using JWKS", "url", cfg.JWKSURL())
+	verifier, err := newVerifier(ctx, cfg, log)
+	if err != nil {
+		return err
 	}
 
 	queries := db.New(pool)
@@ -95,7 +89,7 @@ func run(log *slog.Logger) error {
 	// The MCP endpoint (and its OAuth metadata) lives next to the app's API.
 	mcpOpts := mcpserver.Options{
 		Queries: queries, Verifier: verifier, Enqueuer: queue, Logger: log, Credits: ledger,
-		PublicURL: cfg.PublicURL, AuthServer: cfg.Issuer(),
+		PublicURL: cfg.PublicURL, AuthServer: cfg.AuthKitDomain,
 	}
 	if classifier.Embed != nil {
 		mcpOpts.Embed = classifier.Embed
@@ -147,6 +141,47 @@ func run(log *slog.Logger) error {
 		log.Warn("stopping workers", "err", qerr)
 	}
 	return err
+}
+
+// newVerifier trusts two kinds of WorkOS tokens:
+//   - the app's AuthKit session tokens (issuer: the WorkOS API, keys per
+//     client id, no audience);
+//   - tokens AuthKit issues to MCP clients over OAuth (issuer: the AuthKit
+//     domain). Their audience is the MCP URL when it's set up as a Resource
+//     Indicator in the dashboard, or the client id when it isn't.
+//
+// Both carry the same WorkOS user id, so they map to the same user.
+func newVerifier(ctx context.Context, cfg config.Config, log *slog.Logger) (*auth.Verifier, error) {
+	var issuers []auth.Issuer
+	if cfg.DevJWTSecret != "" {
+		log.Warn("auth: DEV_JWT_SECRET is set; accepting locally signed tokens. Never set it in production")
+		secret := []byte(cfg.DevJWTSecret)
+		issuers = append(issuers, auth.Issuer{
+			Issuer: auth.DevIssuer, Keyfunc: func(*jwt.Token) (any, error) { return secret, nil }, Methods: []string{"HS256"},
+		})
+	}
+	if !cfg.WorkOSEnabled() {
+		log.Warn("auth: WorkOS not configured; only dev tokens are accepted")
+		return auth.New(issuers...), nil
+	}
+	log.Info("auth: WorkOS AuthKit", "sessions", cfg.SessionJWKSURL(), "mcp", cfg.AuthKitJWKSURL())
+	sessionKeys, err := auth.JWKS(ctx, cfg.SessionJWKSURL())
+	if err != nil {
+		return nil, err
+	}
+	mcpKeys, err := auth.JWKS(ctx, cfg.AuthKitJWKSURL())
+	if err != nil {
+		return nil, err
+	}
+	issuers = append(issuers, auth.Issuer{
+		Issuer: cfg.AuthKitDomain, Keyfunc: mcpKeys, Methods: auth.Asymmetric,
+		Audiences: []string{cfg.MCPResource(), cfg.WorkOSClientID},
+	})
+	// WorkOS's docs show the session issuer both with and without the slash.
+	for _, iss := range []string{cfg.WorkOSAPIURL, cfg.WorkOSAPIURL + "/"} {
+		issuers = append(issuers, auth.Issuer{Issuer: iss, Keyfunc: sessionKeys, Methods: auth.Asymmetric})
+	}
+	return auth.New(issuers...), nil
 }
 
 // newClassifier wires whichever AI services are configured. Missing keys
