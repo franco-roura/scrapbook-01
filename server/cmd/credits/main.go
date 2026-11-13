@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/aaugoustis/waitlist/server/internal/auth"
+	"github.com/aaugoustis/waitlist/server/internal/config"
 	"github.com/aaugoustis/waitlist/server/internal/credits"
 	"github.com/aaugoustis/waitlist/server/internal/db"
 )
@@ -51,6 +52,9 @@ func run(args []string) error {
 		return fmt.Errorf("-user is required")
 	}
 
+	if err := config.LoadDotEnv(".env"); err != nil {
+		return err
+	}
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
 	if err != nil {

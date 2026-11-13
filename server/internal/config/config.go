@@ -71,7 +71,12 @@ type Config struct {
 	ShutdownTimeout time.Duration
 }
 
+// Load reads settings from the environment, after filling in anything unset
+// from ./.env (so `go run ./cmd/api` works the same in any shell).
 func Load() (Config, error) {
+	if err := LoadDotEnv(".env"); err != nil {
+		return Config{}, fmt.Errorf("config: read .env: %w", err)
+	}
 	c := Config{
 		Addr:            env("ADDR", ":8080"),
 		DatabaseURL:     os.Getenv("DATABASE_URL"),

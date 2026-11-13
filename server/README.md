@@ -19,9 +19,10 @@ Re-saving a link without a new description, or a category the user picked themse
 ```bash
 docker compose up -d --wait          # Postgres (pgvector image) on port 54329
 cp .env.example .env                 # then fill the two WORKOS_ values
-set -a; . ./.env; set +a
-go run ./cmd/api                     # applies migrations on start
+go run ./cmd/api                     # reads .env, applies migrations on start
 ```
+
+The API and `cmd/credits` read `.env` from the folder you run them in, in any shell. Variables already set in the environment take priority, so deployments can ignore the file.
 
 Sign-in is [WorkOS AuthKit](https://workos.com/docs/authkit). Requests carry an AuthKit access token (`Authorization: Bearer <token>`), checked against WorkOS's public keys. Two kinds are accepted: the app's session tokens (issuer: the WorkOS API) and the tokens AuthKit gives MCP clients (issuer: your AuthKit domain, audience: `<PUBLIC_URL>/mcp`). WorkOS user ids (`user_01H…`) become stable uuids (`auth.UserIDFor`, a name-based uuid), so the database needs no users table and both token kinds map to the same person.
 
