@@ -1,7 +1,22 @@
-import { Button, NavBar, Panel, SectionHeader, Toaster } from "@franco_roura/module-01";
-import { CtaBanner, Footer, Hero, Tag } from "@franco_roura/module-01/site";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+  Bubble,
+  Button,
+  Message,
+  MessageAvatar,
+  MessageContent,
+  MessageHeader,
+  NavBar,
+  Panel,
+  SectionHeader,
+  ShareBar,
+  Toaster,
+} from "@franco_roura/module-01";
+import { CompareList, CtaBanner, Footer, Hero, Tag } from "@franco_roura/module-01/site";
 
-import { ChatExchange, CompareList, FaqItem, ShareBar } from "./parts";
 import { WaitlistForm } from "./WaitlistForm";
 
 const sources = ["Instagram", "TikTok", "YouTube", "X", "Facebook", "WhatsApp", "Cualquier link"];
@@ -82,11 +97,6 @@ const faqs = [
   },
 ];
 
-/** Jumps to the waitlist form at the top and puts the cursor in its first field. */
-function focusWaitlist() {
-  document.querySelector<HTMLInputElement>("#lista input")?.focus({ preventScroll: true });
-}
-
 const section = "mx-auto w-full max-w-content-max px-6 md:px-12";
 
 export default function App() {
@@ -96,11 +106,13 @@ export default function App() {
         <NavBar
           brand={<span className="font-display text-display-sm">Scrapbook/01</span>}
           links={[
-            { label: "Cómo funciona", href: "#como-funciona", desktopOnly: true },
-            { label: "Por qué", href: "#por-que", desktopOnly: true },
-            { label: "Precio", href: "#precio", desktopOnly: true },
-            { label: "Preguntas", href: "#preguntas", desktopOnly: true },
+            { label: "Cómo funciona", href: "#como-funciona" },
+            { label: "Por qué", href: "#por-que" },
+            { label: "Precio", href: "#precio" },
+            { label: "Preguntas", href: "#preguntas" },
           ]}
+          mobileMenu
+          menuLabel="Menú"
           end={
             <Button asChild size="sm">
               <a href="#lista">Sumarme</a>
@@ -112,8 +124,9 @@ export default function App() {
       <main className="flex flex-col gap-24 pt-12 pb-16">
         <div className={section}>
           <Hero
-            // Michroma is wide: the hero's phone size doesn't fit the full name on a 375px screen.
-            title={<span className="max-md:text-display-md">Scrapbook/01</span>}
+            // Michroma is wide: at the kit's sizes "Scrapbook/01" overflows a 375px screen, and on
+            // desktop the column beside the wide image frame. One step down fits both.
+            title={<span className="text-display-md md:text-display-lg">Scrapbook/01</span>}
             subtitle="Lista de espera · primeros 1.000 lugares"
             lead={
               <>
@@ -135,12 +148,11 @@ export default function App() {
             }
             image={
               <img
-                src="/share.png"
-                alt="La hoja para compartir de la app: un link de Instagram y el campo “What is it about?” con una descripción escrita"
-                className="object-top"
+                src="/app.png"
+                alt="Tres pantallas de la app: compartir un link y contar de qué se trata, la biblioteca ordenada en categorías y las conexiones de un guardado"
               />
             }
-            imageLabel="SHARE SHEET"
+            imageShape="wide"
             serial="S-00 · WAITLIST"
           />
           <ul aria-label="Funciona con" className="mt-8 flex flex-wrap gap-2">
@@ -213,7 +225,9 @@ export default function App() {
           />
           <div className="mt-12 grid gap-8 md:grid-cols-2">
             <Panel serial="D-01" hinge="32px" bodyClassName="p-8 pt-12">
-              <p className="hud text-signal-ink">Tus palabras, no un robot</p>
+              <Tag tone="signal" wrap>
+                Tus palabras, no un robot
+              </Tag>
               <h3 className="mt-4 font-display text-display-sm text-ink">
                 Lo encontrás por lo que es
               </h3>
@@ -223,12 +237,21 @@ export default function App() {
                 realmente es.
               </p>
               <CompareList
-                instead="Un link pelado que no dice qué era"
-                get="Tu nota, una categoría y lo que se le parece"
+                className="mt-6"
+                insteadLabel="En lugar de"
+                getLabel="Con Scrapbook/01"
+                items={[
+                  {
+                    instead: "Un link pelado que no dice qué era",
+                    get: "Tu nota, una categoría y lo que se le parece",
+                  },
+                ]}
               />
             </Panel>
             <Panel serial="D-02" hinge="65%" bodyClassName="p-8 pt-12">
-              <p className="hud text-signal-ink">Con la IA que ya usás</p>
+              <Tag tone="signal" wrap>
+                Con la IA que ya usás
+              </Tag>
               <h3 className="mt-4 font-display text-display-sm text-ink">Preguntale a tu IA</h3>
               <p className="mt-3 text-body-md text-ink-soft">
                 Conectás Claude, ChatGPT u otra compatible con MCP y le preguntás por lo que
@@ -236,14 +259,40 @@ export default function App() {
                 relacionado. Lo que piensa corre en tu propio plan: no te cobramos tokens.
               </p>
               <CompareList
-                instead="Buscar a mano en cinco apps"
-                get="Preguntás en tu chat y te lo trae"
+                className="mt-6"
+                insteadLabel="En lugar de"
+                getLabel="Con Scrapbook/01"
+                items={[
+                  {
+                    instead: "Buscar a mano en cinco apps",
+                    get: "Preguntás en tu chat y te lo trae",
+                  },
+                ]}
               />
             </Panel>
           </div>
           <div className="mt-8 grid gap-8 md:grid-cols-3">
             {examples.map((e, i) => (
-              <ChatExchange key={e.you} serial={`E-0${i + 1}`} you={e.you} ai={e.ai} />
+              <Panel
+                key={e.you}
+                serial={`E-0${i + 1}`}
+                notch="sm"
+                className="h-full"
+                bodyClassName="flex h-full flex-col gap-4 p-6 pt-10"
+              >
+                <Message align="end">
+                  <MessageContent>
+                    <Bubble>{e.you}</Bubble>
+                  </MessageContent>
+                </Message>
+                <Message>
+                  <MessageAvatar fallback="IA" />
+                  <MessageContent>
+                    <MessageHeader>Tu IA</MessageHeader>
+                    <Bubble>{e.ai}</Bubble>
+                  </MessageContent>
+                </Message>
+              </Panel>
             ))}
           </div>
         </section>
@@ -266,22 +315,12 @@ export default function App() {
             <Panel serial="K-01 · 80/20" cross bodyClassName="flex flex-col gap-4 p-8 pt-12">
               <p className="text-label text-ink">De cada peso que gastás en créditos</p>
               <ShareBar
-                label="80% procesa tus guardados, 20% es lo que cobramos"
+                label="Cómo se reparte lo que gastás en créditos"
                 parts={[
-                  { share: 80, label: "80% tus guardados" },
-                  { share: 20, label: "20%" },
+                  { share: 80, label: "Modelos de IA que ordenan y conectan tus guardados" },
+                  { share: 20, label: "Lo que cobramos nosotros. Si no lo usás, no ganamos" },
                 ]}
               />
-              <ul className="grid gap-1 text-body-sm text-ink-soft">
-                <li>
-                  <span aria-hidden className="mr-2 inline-block size-2.5 rounded-xs bg-ink" />
-                  80%: va directo a los modelos de IA que ordenan y conectan tus guardados.
-                </li>
-                <li>
-                  <span aria-hidden className="mr-2 inline-block size-2.5 rounded-xs bg-signal" />
-                  20%: es lo que cobramos nosotros. Si no lo usás, no ganamos.
-                </li>
-              </ul>
               <Panel recess notch={false} bodyClassName="p-4 text-body-sm text-ink">
                 <strong>Condición de fundador:</strong> este modelo está garantizado para los
                 primeros 1.000 de la lista.
@@ -299,13 +338,14 @@ export default function App() {
               title="Preguntas frecuentes"
               ruler
             />
-            <div className="mt-12 grid gap-4">
-              {faqs.map((f) => (
-                <FaqItem key={f.q} question={f.q}>
-                  {f.a}
-                </FaqItem>
+            <Accordion type="single" collapsible className="mt-12">
+              {faqs.map((f, i) => (
+                <AccordionItem key={f.q} value={f.q}>
+                  <AccordionTrigger code={`Q-0${i + 1}`}>{f.q}</AccordionTrigger>
+                  <AccordionContent>{f.a}</AccordionContent>
+                </AccordionItem>
               ))}
-            </div>
+            </Accordion>
           </div>
         </section>
 
@@ -314,14 +354,9 @@ export default function App() {
             code="S-06 · LISTA DE ESPERA"
             title="Lo que guardaste, cuando lo necesitás."
             text="Sumate a la lista y asegurá tu lugar entre los primeros 1.000."
-            action={
-              <Button asChild variant="secondary" size="lg">
-                <a href="#lista" onClick={focusWaitlist}>
-                  Quiero mi lugar →
-                </a>
-              </Button>
-            }
-          />
+          >
+            <WaitlistForm onSignal />
+          </CtaBanner>
         </div>
       </main>
 

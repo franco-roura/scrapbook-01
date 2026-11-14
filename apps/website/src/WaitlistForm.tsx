@@ -4,8 +4,11 @@ import { toast } from "sonner";
 
 import { submit, validate, type Signup } from "./waitlist";
 
-/** Name, email and "Quiero mi lugar", in one row on wide screens. */
-export function WaitlistForm() {
+/**
+ * Name, email and "Quiero mi lugar", in one row on wide screens. `onSignal` is for the CtaBanner,
+ * where the submit is a `secondary` (shell) button.
+ */
+export function WaitlistForm({ onSignal = false }: { onSignal?: boolean }) {
   const id = useId();
   const [values, setValues] = useState<Signup>({ name: "", email: "" });
   const [error, setError] = useState<{ field: keyof Signup; message: string } | null>(null);
@@ -77,7 +80,13 @@ export function WaitlistForm() {
           aria-invalid={error?.field === "email" || undefined}
         />
       </Field>
-      <Button type="submit" size="lg" disabled={sending} arrow>
+      <Button
+        type="submit"
+        size="lg"
+        variant={onSignal ? "secondary" : "default"}
+        disabled={sending}
+        arrow
+      >
         {sending ? "Enviando…" : "Quiero mi lugar"}
       </Button>
     </form>
