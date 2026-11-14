@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import "@franco_roura/module-01/theme.css";
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--spacing-nav-height) + 2rem);
+}

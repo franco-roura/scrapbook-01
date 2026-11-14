@@ -14,7 +14,7 @@ made.
 | --- | --- |
 | [`apps/mobile`](../apps/mobile) | The Expo app (iOS, Android, web), the share sheet, and the graph. [README](../apps/mobile/README.md) |
 | [`server`](../server) | The Go API, MCP server, sorting worker, migrations and CLIs. [README](../server/README.md) |
-| [`site`](../site) | The landing page (one static HTML file) |
+| [`apps/website`](../apps/website) | The landing page and waitlist: Vite+, React and Module/01. [README](../apps/website/README.md) |
 | [`sst.config.ts`](../sst.config.ts) | The AWS deployment |
 | [`scripts/docs`](../scripts/docs) | The demo, screenshot and diagram scripts |
 | [`docs`](.) | These pages, and their images |

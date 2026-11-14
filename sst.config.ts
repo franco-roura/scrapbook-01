@@ -86,7 +86,11 @@ export default $config({
       permissions: [{ actions: ["lambda:InvokeFunction"], resources: [worker.arn] }],
     });
 
-    const landing = new sst.aws.StaticSite("Landing", { path: "site" });
+    // The landing page and waitlist (Vite+, React, Module/01).
+    const landing = new sst.aws.StaticSite("Landing", {
+      path: "apps/website",
+      build: { command: "bun run build", output: "dist" },
+    });
 
     // Catches items whose classification was missed or waited for credits.
     // Hourly, so Neon (which wakes for 5 minutes per query) mostly sleeps.
