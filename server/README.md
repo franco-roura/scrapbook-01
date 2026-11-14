@@ -26,6 +26,10 @@ The API and `cmd/credits` read `.env` from the folder you run them in, in any sh
 
 Sign-in is [WorkOS AuthKit](https://workos.com/docs/authkit). Requests carry an AuthKit access token (`Authorization: Bearer <token>`), checked against WorkOS's public keys. Two kinds are accepted: the app's session tokens (issuer: the WorkOS API) and the tokens AuthKit gives MCP clients (issuer: your AuthKit domain, audience: `<PUBLIC_URL>/mcp`). WorkOS user ids (`user_01H…`) become stable uuids (`auth.UserIDFor`, a name-based uuid), so the database needs no users table and both token kinds map to the same person.
 
+## Deploy
+
+On AWS it runs as Lambdas (`cmd/lambda-api`, `cmd/lambda-worker`) with Neon for Postgres, for about $0 a month. See [DEPLOY.md](../DEPLOY.md).
+
 ## Endpoints
 
 All `/v1` routes need a token. Users only ever see their own items.
@@ -91,7 +95,8 @@ TYPESAFE_API_KEY=dev TYPESAFE_BASE_URL=http://127.0.0.1:8787 EMBEDDINGS_API_KEY=
 
 ## Layout
 
-- `cmd/api`: entry point (config, migrations, HTTP server, graceful shutdown).
+- `cmd/api`: local entry point (config, migrations, HTTP server, River workers, graceful shutdown). `cmd/lambda-api` and `cmd/lambda-worker`: the AWS Lambda entry points. `cmd/migrate`: migrations on their own, for deploys.
+- `internal/app`: wiring shared by all entry points.
 - `db/migrations`: goose SQL migrations, embedded into the binary.
 - `db/queries`: SQL for sqlc. Generated Go code is in `internal/db` (don't edit it).
 - `internal/api`: handlers. `internal/auth`: token checks. `internal/links`: URL cleanup and platform detection.
@@ -113,8 +118,8 @@ On macOS or Linux, use `"$(pwd)"` instead of `"$(pwd -W)"` and drop `MSYS_NO_PAT
 
 ```bash
 go test ./...
-TEST_DATABASE_URL='postgres://scrapbook:scrapbook@localhost:54329/scrapbook?sslmode=disable' \
+TEST_DATABASE_URL='postgres://scrapbook:scrapbook@localhost:54329/scrapbook_test?sslmode=disable' \
   go test -tags integration -p 1 ./internal/db/ ./internal/classify/ ./internal/mcpserver/ ./internal/credits/
 ```
 
-The integration tests reset the schema, so point them at a disposable database.
+The integration tests reset the schema, so they use their own database, never the one `go run ./cmd/api` uses. Create it once: `docker compose exec db psql -U scrapbook -c 'CREATE DATABASE scrapbook_test'`.

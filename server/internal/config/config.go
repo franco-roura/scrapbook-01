@@ -42,6 +42,10 @@ type Config struct {
 	// see it in the OAuth protected-resource metadata.
 	PublicURL string
 
+	// WorkerFunctionName is the worker Lambda the API invokes on AWS
+	// (set by SST). Unused locally, where River runs the jobs.
+	WorkerFunctionName string
+
 	// RunWorkers processes background jobs (classification) in this process.
 	RunWorkers bool
 
@@ -91,18 +95,19 @@ func Load() (Config, error) {
 		DevJWTSecret:    os.Getenv("DEV_JWT_SECRET"),
 		ShutdownTimeout: 10 * time.Second,
 
-		PublicURL:         strings.TrimRight(env("PUBLIC_URL", "http://localhost:8080"), "/"),
-		RunWorkers:        env("RUN_WORKERS", "true") == "true",
-		TypeSafeAPIKey:    os.Getenv("TYPESAFE_API_KEY"),
-		TypeSafeBaseURL:   env("TYPESAFE_BASE_URL", "https://api.typesafe.ai"),
-		JevModel:          env("JEV_MODEL", "jev-latest"),
-		EmbeddingsAPIKey:  os.Getenv("EMBEDDINGS_API_KEY"),
-		EmbeddingsBaseURL: env("EMBEDDINGS_BASE_URL", "https://openrouter.ai/api/v1"),
-		EmbeddingsModel:   env("EMBEDDINGS_MODEL", "openai/text-embedding-3-small"),
-		AnthropicAPIKey:   os.Getenv("ANTHROPIC_API_KEY"),
-		NamerModel:        env("CATEGORY_NAMER_MODEL", "claude-haiku-5-5"),
-		NamerEnabled:      env("CATEGORY_NAMER_ENABLED", "true") == "true",
-		ExpoAccessToken:   os.Getenv("EXPO_ACCESS_TOKEN"),
+		PublicURL:          strings.TrimRight(env("PUBLIC_URL", "http://localhost:8080"), "/"),
+		RunWorkers:         env("RUN_WORKERS", "true") == "true",
+		WorkerFunctionName: os.Getenv("WORKER_FUNCTION_NAME"),
+		TypeSafeAPIKey:     os.Getenv("TYPESAFE_API_KEY"),
+		TypeSafeBaseURL:    env("TYPESAFE_BASE_URL", "https://api.typesafe.ai"),
+		JevModel:           env("JEV_MODEL", "jev-latest"),
+		EmbeddingsAPIKey:   os.Getenv("EMBEDDINGS_API_KEY"),
+		EmbeddingsBaseURL:  env("EMBEDDINGS_BASE_URL", "https://openrouter.ai/api/v1"),
+		EmbeddingsModel:    env("EMBEDDINGS_MODEL", "openai/text-embedding-3-small"),
+		AnthropicAPIKey:    os.Getenv("ANTHROPIC_API_KEY"),
+		NamerModel:         env("CATEGORY_NAMER_MODEL", "claude-haiku-5-5"),
+		NamerEnabled:       env("CATEGORY_NAMER_ENABLED", "true") == "true",
+		ExpoAccessToken:    os.Getenv("EXPO_ACCESS_TOKEN"),
 	}
 	var errs []error
 	floatEnv := func(key, fallback string, dst *float64) {

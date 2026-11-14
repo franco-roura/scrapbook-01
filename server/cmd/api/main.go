@@ -1,4 +1,5 @@
-// Command api serves the Scrapbook/01 HTTP API.
+// Command api serves the Scrapbook/01 HTTP API locally (or on any server):
+// API, MCP and River workers in one long-lived process.
 package main
 
 import (
@@ -12,22 +13,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
 
-	"github.com/aaugoustis/waitlist/server/db/migrations"
-	"github.com/aaugoustis/waitlist/server/internal/ai"
-	"github.com/aaugoustis/waitlist/server/internal/api"
-	"github.com/aaugoustis/waitlist/server/internal/auth"
-	"github.com/aaugoustis/waitlist/server/internal/classify"
+	"github.com/aaugoustis/waitlist/server/internal/app"
 	"github.com/aaugoustis/waitlist/server/internal/config"
-	"github.com/aaugoustis/waitlist/server/internal/credits"
-	"github.com/aaugoustis/waitlist/server/internal/db"
 	"github.com/aaugoustis/waitlist/server/internal/jobs"
-	"github.com/aaugoustis/waitlist/server/internal/mcpserver"
-	"github.com/aaugoustis/waitlist/server/internal/push"
 )
 
 func main() {
@@ -53,29 +43,16 @@ func run(log *slog.Logger) error {
 	defer pool.Close()
 
 	if cfg.MigrateOnStart {
-		if err := migrate(ctx, pool); err != nil {
+		if err := app.Migrate(ctx, pool); err != nil {
 			return err
 		}
 	}
 
-	verifier, err := newVerifier(ctx, cfg, log)
-	if err != nil {
-		return err
-	}
-
-	queries := db.New(pool)
-	if cfg.MigrateOnStart {
-		if err := jobs.Migrate(ctx, pool); err != nil {
-			return err
-		}
-	}
-	ledger := &credits.Ledger{Q: queries, Starter: cfg.StarterCredits}
-	classifier := newClassifier(cfg, queries, log)
-	classifier.Credits = ledger
+	core := app.NewCore(cfg, pool, log)
 	queue, err := jobs.New(jobs.Options{
 		Pool:       pool,
-		Queries:    queries,
-		Classifier: classifier,
+		Queries:    core.Queries,
+		Classifier: core.Classifier,
 		Logger:     log,
 		RunWorkers: cfg.RunWorkers,
 	})
@@ -86,34 +63,13 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("start workers: %w", err)
 	}
 
-	// The MCP endpoint (and its OAuth metadata) lives next to the app's API.
-	mcpOpts := mcpserver.Options{
-		Queries: queries, Verifier: verifier, Enqueuer: queue, Logger: log, Credits: ledger,
-		PublicURL: cfg.PublicURL, AuthServer: cfg.AuthKitDomain,
+	handler, err := core.Handler(ctx, queue)
+	if err != nil {
+		return err
 	}
-	if classifier.Embed != nil {
-		mcpOpts.Embed = classifier.Embed
-	}
-	if classifier.Jev != nil { // only with TYPESAFE_API_KEY set
-		mcpOpts.Rerank = classifier.Jev
-	}
-	mcpHandler := mcpserver.New(mcpOpts).Handler()
-	root := http.NewServeMux()
-	root.Handle(mcpserver.Path, mcpHandler)
-	root.Handle("/.well-known/", mcpHandler)
-	root.Handle("/", api.New(api.Options{
-		Queries:     queries,
-		Logger:      log,
-		Verifier:    verifier,
-		Ping:        pool.Ping,
-		CORSOrigins: cfg.CORSOrigins,
-		Enqueuer:    queue,
-		Credits:     ledger,
-	}).Handler())
-
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           root,
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -141,89 +97,4 @@ func run(log *slog.Logger) error {
 		log.Warn("stopping workers", "err", qerr)
 	}
 	return err
-}
-
-// newVerifier trusts two kinds of WorkOS tokens:
-//   - the app's AuthKit session tokens (issuer: the WorkOS API, keys per
-//     client id, no audience);
-//   - tokens AuthKit issues to MCP clients over OAuth (issuer: the AuthKit
-//     domain). Their audience is the MCP URL when it's set up as a Resource
-//     Indicator in the dashboard, or the client id when it isn't.
-//
-// Both carry the same WorkOS user id, so they map to the same user.
-func newVerifier(ctx context.Context, cfg config.Config, log *slog.Logger) (*auth.Verifier, error) {
-	var issuers []auth.Issuer
-	if cfg.DevJWTSecret != "" {
-		log.Warn("auth: DEV_JWT_SECRET is set; accepting locally signed tokens. Never set it in production")
-		secret := []byte(cfg.DevJWTSecret)
-		issuers = append(issuers, auth.Issuer{
-			Issuer: auth.DevIssuer, Keyfunc: func(*jwt.Token) (any, error) { return secret, nil }, Methods: []string{"HS256"},
-		})
-	}
-	if !cfg.WorkOSEnabled() {
-		log.Warn("auth: WorkOS not configured; only dev tokens are accepted")
-		return auth.New(issuers...), nil
-	}
-	log.Info("auth: WorkOS AuthKit", "sessions", cfg.SessionJWKSURL(), "mcp", cfg.AuthKitJWKSURL())
-	sessionKeys, err := auth.JWKS(ctx, cfg.SessionJWKSURL())
-	if err != nil {
-		return nil, err
-	}
-	mcpKeys, err := auth.JWKS(ctx, cfg.AuthKitJWKSURL())
-	if err != nil {
-		return nil, err
-	}
-	issuers = append(issuers, auth.Issuer{
-		Issuer: cfg.AuthKitDomain, Keyfunc: mcpKeys, Methods: auth.Asymmetric,
-		Audiences: []string{cfg.MCPResource(), cfg.WorkOSClientID},
-	})
-	// Session tokens: like WorkOS's SDKs, check "iss" only when WORKOS_ISSUER
-	// is set; otherwise the per-client signing keys are the check.
-	issuers = append(issuers, auth.Issuer{Issuer: cfg.WorkOSIssuer, Keyfunc: sessionKeys, Methods: auth.Asymmetric})
-	return auth.New(issuers...), nil
-}
-
-// newClassifier wires whichever AI services are configured. Missing keys
-// turn the matching step off instead of failing the boot, so the API runs
-// locally without any of them.
-func newClassifier(cfg config.Config, q db.Querier, log *slog.Logger) *classify.Classifier {
-	c := &classify.Classifier{
-		Q: q, Log: log,
-		Threshold: cfg.JevThreshold, SameName: 0.85,
-		Neighbors: 5, MinSimilarity: 0.45,
-	}
-	if cfg.TypeSafeAPIKey != "" {
-		c.Jev = &ai.Jev{BaseURL: cfg.TypeSafeBaseURL, APIKey: cfg.TypeSafeAPIKey, Model: cfg.JevModel,
-			Price: ai.Price{Input: cfg.JevPrice}}
-	} else {
-		log.Warn("classify: TYPESAFE_API_KEY not set; items won't be matched to existing categories")
-	}
-	if cfg.EmbeddingsAPIKey != "" {
-		c.Embed = &ai.Embedder{BaseURL: cfg.EmbeddingsBaseURL, APIKey: cfg.EmbeddingsAPIKey, Model: cfg.EmbeddingsModel,
-			Price: ai.Price{Input: cfg.EmbeddingsPrice}}
-	} else {
-		log.Warn("classify: EMBEDDINGS_API_KEY not set; no graph links or duplicate-category checks")
-	}
-	if cfg.NamerEnabled && cfg.AnthropicAPIKey != "" {
-		namer := ai.NewNamer(cfg.AnthropicAPIKey, cfg.NamerModel)
-		namer.Price = ai.Price{Input: cfg.NamerInputPrice, Output: cfg.NamerOutputPrice}
-		c.Namer = namer
-	} else {
-		log.Warn("classify: ANTHROPIC_API_KEY not set or namer disabled; no new categories will be created")
-	}
-	c.Notify = &push.Expo{Q: q, AccessToken: cfg.ExpoAccessToken}
-	return c
-}
-
-func migrate(ctx context.Context, pool *pgxpool.Pool) error {
-	sqlDB := stdlib.OpenDBFromPool(pool)
-	defer sqlDB.Close()
-	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, migrations.FS)
-	if err != nil {
-		return fmt.Errorf("migrations: %w", err)
-	}
-	if _, err := provider.Up(ctx); err != nil {
-		return fmt.Errorf("migrate: %w", err)
-	}
-	return nil
 }

@@ -1,0 +1,14 @@
+{
+  "name": "scrapbook01",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "migrate": "cd server && go run ./cmd/migrate",
+    "deploy": "bun run migrate && sst deploy --stage prod",
+    "diff": "sst diff --stage prod",
+    "remove": "sst remove --stage prod"
+  },
+  "devDependencies": {
+    "sst": "4.17.2"
+  }
+}
