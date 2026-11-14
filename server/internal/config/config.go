@@ -55,6 +55,9 @@ type Config struct {
 	JevModel        string
 	// JevThreshold is the confidence needed to file into an existing category.
 	JevThreshold float64
+	// GraphMinSimilarity is the cosine similarity two items need to be
+	// linked in the graph. It depends on the embeddings model.
+	GraphMinSimilarity float64
 
 	// Embeddings: any OpenAI-compatible /embeddings endpoint returning 1536
 	// dimensions (OpenRouter by default).
@@ -122,6 +125,7 @@ func Load() (Config, error) {
 	floatEnv("STARTER_CREDITS_USD", "0.10", &starterUSD)
 	c.StarterCredits = int64(starterUSD * 1_000_000)
 	floatEnv("JEV_PRICE_PER_MTOK", "0.042", &c.JevPrice)
+	floatEnv("GRAPH_MIN_SIMILARITY", "0.45", &c.GraphMinSimilarity)
 	floatEnv("EMBEDDINGS_PRICE_PER_MTOK", "0.02", &c.EmbeddingsPrice)
 	floatEnv("NAMER_INPUT_PRICE_PER_MTOK", "0.10", &c.NamerInputPrice)
 	floatEnv("NAMER_OUTPUT_PRICE_PER_MTOK", "0.50", &c.NamerOutputPrice)

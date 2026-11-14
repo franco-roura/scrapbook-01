@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 
 import { useAuth } from '../lib/auth';
 import { signOut } from '../lib/push';
@@ -10,7 +10,8 @@ export function HeaderActions() {
   const { session } = useAuth();
   if (!session) return null;
   return (
-    <View className="flex-row items-center gap-4">
+    // The web header has no right inset of its own; match the title's.
+    <View className={`flex-row items-center gap-4 ${Platform.OS === 'web' ? 'pr-4' : ''}`}>
       <Pressable accessibilityRole="button" hitSlop={8} onPress={() => router.push('/credits')}>
         <Text variant="label" className="text-signal-ink">
           Credits

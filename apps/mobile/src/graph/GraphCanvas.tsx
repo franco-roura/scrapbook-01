@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { type ForceGraphMethods, type LinkObject, type NodeObject } from 'react-force-graph-2d';
 
 import './fonts.css';
-import { categoryColor, palette } from './palette';
+import { categoryColorMap, palette } from './palette';
 import type { GraphData, GraphLink, GraphNode } from './types';
 
 type Node = NodeObject<GraphNode & { x?: number; y?: number }>;
@@ -79,6 +79,11 @@ export default function GraphCanvas({ graph, focusId, fitOnLoad, onSelect }: Gra
     return { nodes, links };
   }, [graph, positions]);
 
+  const colors = useMemo(
+    () => categoryColorMap(graph.nodes.filter((n) => n.kind === 'category').map((n) => String(n.id).slice(2))),
+    [graph],
+  );
+
   // Who's next to the highlighted node, for dimming everything else.
   const active = hoverId ?? focusId ?? null;
   const near = useMemo(() => {
@@ -100,10 +105,10 @@ export default function GraphCanvas({ graph, focusId, fitOnLoad, onSelect }: Gra
     if (!mounted || !f) return;
     // Repulsion only between nearby nodes, so clusters stay close together.
     const charge = f.d3Force('charge') as unknown as { strength?: (n: number) => void; distanceMax?: (n: number) => void } | undefined;
-    charge?.strength?.(-35);
-    charge?.distanceMax?.(90);
+    charge?.strength?.(-45);
+    charge?.distanceMax?.(160);
     // A gentle pull to the middle keeps separate clusters from drifting apart.
-    f.d3Force('gravity', gravity(0.1) as never);
+    f.d3Force('gravity', gravity(0.07) as never);
     const link = f.d3Force('link') as unknown as { distance?: (fn: (l: Link) => number) => void } | undefined;
     link?.distance?.((l) => (l.kind === 'category' ? 28 : 18 + (1 - l.weight) * 40));
     f.d3ReheatSimulation();
@@ -130,7 +135,9 @@ export default function GraphCanvas({ graph, focusId, fitOnLoad, onSelect }: Gra
     const dim = active !== null && !near.has(String(n.id));
     ctx.globalAlpha = dim ? 0.25 : 1;
 
-    const hue = n.kind === 'category' ? categoryColor(String(n.id).slice(2)) : n.categoryId ? categoryColor(n.categoryId) : palette.seam;
+    const hue =
+      (n.kind === 'category' ? colors.get(String(n.id).slice(2)) : n.categoryId ? colors.get(n.categoryId) : undefined) ??
+      palette.seam;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, 2 * Math.PI);
     ctx.fillStyle = n.kind === 'category' ? hue : isFocus ? palette.signalTint : palette.shell;
@@ -236,7 +243,7 @@ export default function GraphCanvas({ graph, focusId, fitOnLoad, onSelect }: Gra
           onEngineStop={() => {
             if (fitOnLoad && !fitted.current) {
               fitted.current = true;
-              fg.current?.zoomToFit(500, 30);
+              fg.current?.zoomToFit(500, 70); // room for the category labels
             }
           }}
           cooldownTicks={180}

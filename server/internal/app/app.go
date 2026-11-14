@@ -169,7 +169,7 @@ func newClassifier(cfg config.Config, q db.Querier, log *slog.Logger) *classify.
 	c := &classify.Classifier{
 		Q: q, Log: log,
 		Threshold: cfg.JevThreshold, SameName: 0.85,
-		Neighbors: 5, MinSimilarity: 0.45,
+		Neighbors: 5, MinSimilarity: float32(cfg.GraphMinSimilarity),
 	}
 	if cfg.TypeSafeAPIKey != "" {
 		c.Jev = &ai.Jev{BaseURL: cfg.TypeSafeBaseURL, APIKey: cfg.TypeSafeAPIKey, Model: cfg.JevModel,

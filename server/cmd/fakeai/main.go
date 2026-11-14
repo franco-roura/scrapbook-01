@@ -38,6 +38,13 @@ func main() {
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
+var stopwords = map[string]bool{
+	"with": true, "that": true, "this": true, "from": true, "your": true, "have": true, "what": true,
+	"when": true, "where": true, "will": true, "into": true, "about": true, "after": true, "before": true,
+	"they": true, "them": true, "then": true, "than": true, "just": true, "like": true, "also": true,
+	"things": true, "already": true, "minute": true, "minutes": true, "year": true, "best": true,
+}
+
 func words(s string) []string {
 	return strings.FieldsFunc(strings.ToLower(s), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsNumber(r) })
 }
@@ -96,6 +103,9 @@ func embeddings(w http.ResponseWriter, r *http.Request) {
 	for i, in := range req.Input {
 		v := make([]float32, dims)
 		for _, wd := range words(in) {
+			if len(wd) < 4 || stopwords[wd] {
+				continue // so similarity follows the topic words
+			}
 			h := fnv.New32a()
 			h.Write([]byte(wd))
 			v[h.Sum32()%dims]++

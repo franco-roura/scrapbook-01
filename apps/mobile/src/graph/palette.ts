@@ -35,9 +35,30 @@ const categoryColors = [
   'cat-red', 'cat-cyan', 'cat-lime', 'cat-rose', 'cat-blue', 'cat-yellow', 'cat-brown', 'cat-slate',
 ].map((n) => resolve(n));
 
-/** A stable color per category id. */
-export function categoryColor(id: string): string {
+function slotOf(id: string): number {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return categoryColors[h % categoryColors.length];
+  return h % categoryColors.length;
+}
+
+/** A stable color per category id. */
+export function categoryColor(id: string): string {
+  return categoryColors[slotOf(id)];
+}
+
+/**
+ * Colors for the categories on screen together. Each keeps its own color
+ * unless two collide; then the later id (in sorted order) takes the next
+ * free one, so up to 16 categories all look different.
+ */
+export function categoryColorMap(ids: string[]): Map<string, string> {
+  const used = new Set<number>();
+  const out = new Map<string, string>();
+  for (const id of [...new Set(ids)].sort()) {
+    let slot = slotOf(id);
+    for (let i = 0; used.has(slot) && i < categoryColors.length; i++) slot = (slot + 1) % categoryColors.length;
+    used.add(slot);
+    out.set(id, categoryColors[slot]);
+  }
+  return out;
 }
