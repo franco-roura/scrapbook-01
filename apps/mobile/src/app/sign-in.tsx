@@ -24,7 +24,7 @@ export default function SignIn() {
     try {
       if (await signIn()) router.replace(safeNext(next) as never);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Sign-in failed.');
+      setError(e instanceof Error ? e.message : 'No se pudo entrar.');
     } finally {
       setBusy(false);
     }
@@ -32,18 +32,18 @@ export default function SignIn() {
 
   return (
     <ScrollView className="flex-1 bg-canvas" contentContainerClassName="p-6 gap-6">
-      <HudLabel code="A-01">Account</HudLabel>
-      <Text variant="display">Sign in</Text>
+      <HudLabel code="A-01">Cuenta</HudLabel>
+      <Text variant="display">Entrar</Text>
 
       {!isConfigured ? (
         <Text variant="bodySm" className="text-danger">
-          Sign-in isn’t configured. Set EXPO_PUBLIC_WORKOS_CLIENT_ID.
+          El ingreso no está configurado. Definí EXPO_PUBLIC_WORKOS_CLIENT_ID.
         </Text>
       ) : null}
 
-      <Panel serial="A-01 · EMAIL CODE" className="gap-4">
+      <Panel serial="A-01 · CÓDIGO POR EMAIL" className="gap-4">
         <Text variant="bodySm">
-          We’ll email you a 6-digit code. New here? The same step creates your account.
+          Te mandamos un código de 6 dígitos por email. ¿Sos nuevo? El mismo paso crea tu cuenta.
         </Text>
         {error ? (
           <Text variant="bodySm" className="text-danger">
@@ -51,7 +51,7 @@ export default function SignIn() {
           </Text>
         ) : null}
         <Button onPress={start} loading={busy} disabled={!isConfigured || !ready}>
-          Continue with email
+          Seguir con email
         </Button>
       </Panel>
     </ScrollView>

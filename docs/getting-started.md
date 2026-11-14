@@ -79,16 +79,19 @@ bun install
 bun run web
 ```
 
-Open `http://localhost:8081`, choose **Continue with email**, and enter the code WorkOS emails you.
+Open `http://localhost:8081`, choose **Seguir con email** (continue with email), and enter the code WorkOS emails you.
 
 ## Your first saves
 
-1. **Add link**: paste any link, write what it's about ("lemon chicken, weeknight dinner"), save.
+The app is in Uruguayan Spanish; the labels below are what you'll see, with their meaning.
+
+1. **Agregar link** (add link): paste any link, write what it's about ("pollo al limón, cena de
+   semana"), save.
    Within a second or two it gets a category: the fake AI names it after the longest word.
 2. Save a few more on the same topic. They join that category instead of making new ones.
-3. Open one: change its category, or look at its **Connections**.
-4. **Graph** shows the whole library.
-5. **Credits** shows the free starting budget and what each save cost.
+3. Open one: change its category, or look at its **Conexiones** (connections).
+4. **Mapa** (map) shows the whole library as a graph.
+5. **Créditos** (credits) shows the free starting budget and what each save cost.
 
 The fake AI is crude on purpose: it matches words, not meaning. With real keys, sorting and links
 follow what the descriptions mean.

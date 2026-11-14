@@ -38,7 +38,7 @@ export function useSignIn(): { ready: boolean; start: () => Promise<Session | nu
   const start = useCallback(async () => {
     if (!request) return null;
     const result = await promptAsync();
-    if (result.type === 'error') throw new Error(result.error?.message ?? 'Sign-in failed.');
+    if (result.type === 'error') throw new Error(result.error?.message ?? 'No se pudo entrar.');
     if (result.type !== 'success') return null;
     const session = await authenticate({
       grant_type: 'authorization_code',

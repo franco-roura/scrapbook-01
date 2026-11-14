@@ -64,7 +64,7 @@ sequenceDiagram
   A-->>P: 201, classifying: true
   W->>AI: embed, pick a category (or name one)
   W->>DB: category, links to the 5 nearest, credits used
-  W-)P: push "Saved to Japan trip"
+  W-)P: push "Guardado en Viaje a Japón"
 ```
 
 - The app talks to the API directly; only the web app's files come from CloudFront.

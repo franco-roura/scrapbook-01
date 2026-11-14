@@ -19,8 +19,10 @@
 </p>
 
 <p align="center">
-  <img src="docs/brand/hero.png" alt="Three Scrapbook/01 screens: the share sheet asking 'What is it about?', the library with saves filed into categories like Japan trip and Weeknight dinners, and an item's connections drawn as a small graph" width="880">
+  <img src="docs/brand/hero.png" alt="Three Scrapbook/01 screens, in Spanish: the share sheet asking '¿De qué se trata?' (what is it about?), the library with saves filed into categories like Viaje a Japón and Cenas de semana, and an item's connections drawn as a small graph" width="880">
 </p>
+
+The app and the website are in Uruguayan Spanish; the code and these docs are in English.
 
 ## Contents
 
@@ -79,7 +81,7 @@
 ## Share it, say what it's about
 
 Tap Share in any app and pick Scrapbook/01. A small sheet opens on top of the app you're in, with the
-link filled in and the keyboard up on one question: "What is it about?". Type a few words (or dictate
+link filled in and the keyboard up on one question: "¿De qué se trata?" (what is it about?). Type a few words (or dictate
 them) and tap Save. Skipping is fine too: undescribed saves wait in an inbox.
 
 **[Read more: the features tour →](docs/features.md)**
@@ -100,7 +102,7 @@ your whole library, with category hubs in Module/01's colors and similar saves l
 its connections one or two hops out; tap one to move there while the layout stays put.
 
 <p align="center">
-  <img src="docs/screenshots/graph-wide.png" alt="The graph view: six category hubs (Weeknight dinners, Japan trip, Parenting, Home workouts, Design inspiration, Books to read), each surrounded by the saves filed into it, with similar saves linked" width="880">
+  <img src="docs/screenshots/graph-wide.png" alt="The map view: six category hubs (Cenas de semana, Viaje a Japón, Crianza, Rutinas en casa, Inspiración de diseño, Libros para leer), each surrounded by the saves filed into it, with similar saves linked" width="880">
 </p>
 
 **[Read more: the graph →](docs/features.md#the-graph)**

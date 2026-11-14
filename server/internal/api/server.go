@@ -59,7 +59,7 @@ func New(o Options) *Server {
 	}
 	s.authMW = o.Verifier.Middleware(func(w http.ResponseWriter, r *http.Request, err error) {
 		s.log.InfoContext(r.Context(), "auth rejected", "err", err)
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Sign in again.")
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Volvé a entrar.")
 	})
 	return s
 }
@@ -121,7 +121,7 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 		if err := s.ping(ctx); err != nil {
 			s.log.ErrorContext(r.Context(), "health check failed", "err", err)
-			writeError(w, http.StatusServiceUnavailable, "unavailable", "Database unreachable.")
+			writeError(w, http.StatusServiceUnavailable, "unavailable", "Scrapbook/01 no está disponible. Probá en un rato.")
 			return
 		}
 	}
@@ -157,7 +157,7 @@ func (s *Server) recoverer(next http.Handler) http.Handler {
 					panic(v)
 				}
 				s.log.ErrorContext(r.Context(), "panic", "value", v)
-				writeError(w, http.StatusInternalServerError, "internal", "Something went wrong.")
+				writeError(w, http.StatusInternalServerError, "internal", "Algo salió mal.")
 			}
 		}()
 		next.ServeHTTP(w, r)
@@ -191,7 +191,7 @@ func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
 	if err := dec.Decode(dst); err != nil {
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {
-			writeError(w, http.StatusRequestEntityTooLarge, "too_large", "Request body is too large.")
+			writeError(w, http.StatusRequestEntityTooLarge, "too_large", "Lo que mandaste es demasiado grande.")
 		} else {
 			writeError(w, http.StatusBadRequest, "bad_json", "Request body must be valid JSON.")
 		}

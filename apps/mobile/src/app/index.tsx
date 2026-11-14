@@ -50,14 +50,14 @@ function ItemList({ tab, setTab }: { tab: TabName; setTab: (t: TabName) => void 
         contentContainerClassName="px-6 pb-28 gap-3"
         ListHeaderComponent={
           <View className="gap-4 pb-2 pt-2">
-            <HudLabel code="L-01">Library</HudLabel>
+            <HudLabel code="L-01">Biblioteca</HudLabel>
             <View className="flex-row items-center justify-between">
               <View className="flex-row gap-2 rounded-full bg-shell-recess p-1" accessibilityRole="tablist">
-                <Tab label="All" active={tab === 'all'} onPress={() => setTab('all')} />
-                <Tab label="Undescribed" active={tab === 'inbox'} onPress={() => setTab('inbox')} />
+                <Tab label="Todo" active={tab === 'all'} onPress={() => setTab('all')} />
+                <Tab label="Sin describir" active={tab === 'inbox'} onPress={() => setTab('inbox')} />
               </View>
               <Button variant="secondary" onPress={() => router.push('/graph')}>
-                Graph
+                Mapa
               </Button>
             </View>
             {list.error ? <Text variant="bodySm" className="text-danger">{list.error}</Text> : null}
@@ -69,11 +69,11 @@ function ItemList({ tab, setTab }: { tab: TabName; setTab: (t: TabName) => void 
             <ActivityIndicator className="mt-12" color={colors.signalInk} />
           ) : (
             <View className="mt-12 items-center gap-2">
-              <Text variant="title">{tab === 'inbox' ? 'Nothing to describe' : 'Nothing saved yet'}</Text>
+              <Text variant="title">{tab === 'inbox' ? 'Nada para describir' : 'Todavía no guardaste nada'}</Text>
               <Text variant="bodySm" className="text-center">
                 {tab === 'inbox'
-                  ? 'Items you save without a description show up here.'
-                  : 'Share a post from any app to Scrapbook/01, or add a link.'}
+                  ? 'Lo que guardes sin descripción aparece acá.'
+                  : 'Compartí un post desde cualquier app a Scrapbook/01, o agregá un link.'}
               </Text>
             </View>
           )
@@ -83,7 +83,7 @@ function ItemList({ tab, setTab }: { tab: TabName; setTab: (t: TabName) => void 
         onEndReachedThreshold={0.4}
       />
       <View className="absolute bottom-8 left-6 right-6">
-        <Button onPress={() => router.push('/share')}>Add link</Button>
+        <Button onPress={() => router.push('/share')}>Agregar link</Button>
       </View>
     </SafeAreaView>
   );
@@ -105,7 +105,7 @@ function Tab({ label, active, onPress }: { label: string; active: boolean; onPre
 }
 
 function Row({ item, index }: { item: Item; index: number }) {
-  const date = new Date(item.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  const date = new Date(item.createdAt).toLocaleDateString('es-UY', { day: 'numeric', month: 'short' });
   return (
     <Link href={{ pathname: '/item/[id]', params: { id: item.id } }} asChild>
       <Pressable className="gap-2 rounded-lg bg-shell p-4 active:bg-shell-recess">
@@ -121,16 +121,16 @@ function Row({ item, index }: { item: Item; index: number }) {
           </Text>
         ) : (
           <Text variant="bodySm" className="text-signal-ink">
-            No description yet · tap to add one
+            Sin descripción · tocá para agregarla
           </Text>
         )}
         <View className="flex-row items-center gap-2">
           {item.category ? (
             <Chip tone="signal">{item.category.name}</Chip>
           ) : item.waitingForCredits ? (
-            <Chip>Waiting for credits</Chip>
+            <Chip>Esperando créditos</Chip>
           ) : item.classifying ? (
-            <Chip>Sorting…</Chip>
+            <Chip>Ordenando…</Chip>
           ) : null}
           <Text variant="bodySm" numberOfLines={1} className="flex-1">
             {hostOf(item.url)}

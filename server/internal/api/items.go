@@ -93,16 +93,16 @@ func (s *Server) createItem(w http.ResponseWriter, r *http.Request) {
 	}
 	norm, platform, err := links.Normalize(req.URL)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, "invalid_url", "That doesn't look like a link.")
+		writeError(w, http.StatusUnprocessableEntity, "invalid_url", "Eso no parece un link.")
 		return
 	}
 	if len(norm) > 2048 {
-		writeError(w, http.StatusUnprocessableEntity, "invalid_url", "That link is too long.")
+		writeError(w, http.StatusUnprocessableEntity, "invalid_url", "Ese link es demasiado largo.")
 		return
 	}
 	desc, ok := cleanDescription(req.Description)
 	if !ok {
-		writeError(w, http.StatusUnprocessableEntity, "description_too_long", "Keep the description under 2000 characters.")
+		writeError(w, http.StatusUnprocessableEntity, "description_too_long", "La descripción tiene que tener menos de 2000 caracteres.")
 		return
 	}
 
@@ -206,7 +206,7 @@ func (s *Server) getItem(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := s.q.GetItem(r.Context(), db.GetItemParams{ID: id, UserID: user})
 	if errors.Is(err, pgx.ErrNoRows) {
-		writeError(w, http.StatusNotFound, "not_found", "Item not found.")
+		writeError(w, http.StatusNotFound, "not_found", "No encontramos ese guardado.")
 		return
 	}
 	if err != nil {
@@ -248,7 +248,7 @@ func (s *Server) updateItem(w http.ResponseWriter, r *http.Request) {
 		}
 		var ok bool
 		if desc, ok = cleanDescription(d); !ok {
-			writeError(w, http.StatusUnprocessableEntity, "description_too_long", "Keep the description under 2000 characters.")
+			writeError(w, http.StatusUnprocessableEntity, "description_too_long", "La descripción tiene que tener menos de 2000 caracteres.")
 			return
 		}
 	}
@@ -265,7 +265,7 @@ func (s *Server) updateItem(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if !owned {
-				writeError(w, http.StatusUnprocessableEntity, "unknown_category", "That category doesn't exist.")
+				writeError(w, http.StatusUnprocessableEntity, "unknown_category", "Esa categoría no existe.")
 				return
 			}
 		}
@@ -274,7 +274,7 @@ func (s *Server) updateItem(w http.ResponseWriter, r *http.Request) {
 	if hasDesc {
 		needs, err := s.q.SetItemDescription(r.Context(), db.SetItemDescriptionParams{Description: desc, ID: id, UserID: user})
 		if errors.Is(err, pgx.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "not_found", "Item not found.")
+			writeError(w, http.StatusNotFound, "not_found", "No encontramos ese guardado.")
 			return
 		}
 		if err != nil {
@@ -289,7 +289,7 @@ func (s *Server) updateItem(w http.ResponseWriter, r *http.Request) {
 	if hasCat {
 		old, err := s.q.SetItemCategoryByUser(r.Context(), db.SetItemCategoryByUserParams{CategoryID: catID, ID: id, UserID: user})
 		if errors.Is(err, pgx.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "not_found", "Item not found.")
+			writeError(w, http.StatusNotFound, "not_found", "No encontramos ese guardado.")
 			return
 		}
 		if err != nil {
@@ -308,7 +308,7 @@ func (s *Server) updateItem(w http.ResponseWriter, r *http.Request) {
 
 	item, err := s.q.GetItem(r.Context(), db.GetItemParams{ID: id, UserID: user})
 	if errors.Is(err, pgx.ErrNoRows) {
-		writeError(w, http.StatusNotFound, "not_found", "Item not found.")
+		writeError(w, http.StatusNotFound, "not_found", "No encontramos ese guardado.")
 		return
 	}
 	if err != nil {
@@ -346,7 +346,7 @@ func (s *Server) deleteItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if n == 0 {
-		writeError(w, http.StatusNotFound, "not_found", "Item not found.")
+		writeError(w, http.StatusNotFound, "not_found", "No encontramos ese guardado.")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -386,7 +386,7 @@ func (s *Server) createCategory(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.Join(strings.Fields(req.Name), " ")
 	if n := utf8.RuneCountInString(name); n < 1 || n > 60 {
-		writeError(w, http.StatusUnprocessableEntity, "bad_name", "Category names are 1 to 60 characters.")
+		writeError(w, http.StatusUnprocessableEntity, "bad_name", "El nombre de la categoría va de 1 a 60 caracteres.")
 		return
 	}
 	// No name embedding yet, so the duplicate-name check skips this one;
@@ -437,7 +437,7 @@ func (s *Server) enqueueClassify(r *http.Request, id uuid.UUID) {
 func pathID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		writeError(w, http.StatusNotFound, "not_found", "Item not found.")
+		writeError(w, http.StatusNotFound, "not_found", "No encontramos ese guardado.")
 		return uuid.Nil, false
 	}
 	return id, true
@@ -445,7 +445,7 @@ func pathID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 
 func (s *Server) internal(w http.ResponseWriter, r *http.Request, what string, err error) {
 	s.log.ErrorContext(r.Context(), what, "err", err)
-	writeError(w, http.StatusInternalServerError, "internal", "Something went wrong.")
+	writeError(w, http.StatusInternalServerError, "internal", "Algo salió mal.")
 }
 
 func encodeCursor(t time.Time, id uuid.UUID) string {

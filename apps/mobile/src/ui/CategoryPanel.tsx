@@ -21,7 +21,7 @@ export function CategoryPanel({ item, onChange }: { item: Item; onChange: (item:
     try {
       setCategories(await api.listCategories());
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Something went wrong.');
+      setError(e instanceof ApiError ? e.message : 'Algo salió mal.');
     }
   }
 
@@ -32,7 +32,7 @@ export function CategoryPanel({ item, onChange }: { item: Item; onChange: (item:
       onChange(await api.setItemCategory(item.id, categoryId));
       setOpen(false);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Something went wrong.');
+      setError(e instanceof ApiError ? e.message : 'Algo salió mal.');
     } finally {
       setBusy(false);
     }
@@ -48,7 +48,7 @@ export function CategoryPanel({ item, onChange }: { item: Item; onChange: (item:
       onChange(await api.setItemCategory(item.id, cat.id));
       setOpen(false);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Something went wrong.');
+      setError(e instanceof ApiError ? e.message : 'Algo salió mal.');
     } finally {
       setBusy(false);
     }
@@ -58,30 +58,30 @@ export function CategoryPanel({ item, onChange }: { item: Item; onChange: (item:
   const sorting = item.classifying && item.categorySource === 'auto' && !waiting;
 
   return (
-    <Panel notch="sm" serial={item.categorySource === 'user' ? 'C-01 · SET BY YOU' : 'C-01 · AUTO'} className="gap-4">
+    <Panel notch="sm" serial={item.categorySource === 'user' ? 'C-01 · ELEGIDA POR VOS' : 'C-01 · AUTOMÁTICA'} className="gap-4">
       <View className="flex-row items-center justify-between gap-3">
         <View className="flex-1 gap-1">
-          <Text variant="label">Category</Text>
+          <Text variant="label">Categoría</Text>
           {waiting ? (
             <View className="gap-1">
-              <Text variant="title">Waiting for credits</Text>
-              <Text variant="bodySm">It’s saved. It will be sorted and linked once you add credits.</Text>
+              <Text variant="title">Esperando créditos</Text>
+              <Text variant="bodySm">Está guardado. Se va a ordenar y conectar cuando cargues créditos.</Text>
               <Button variant="ghost" className="self-start px-0" onPress={() => router.push('/credits')}>
-                See credits
+                Ver créditos
               </Button>
             </View>
           ) : sorting ? (
             <View className="flex-row items-center gap-2">
               <ActivityIndicator size="small" color={colors.signalInk} />
-              <Text variant="bodySm">Sorting…</Text>
+              <Text variant="bodySm">Ordenando…</Text>
             </View>
           ) : (
-            <Text variant="title">{item.category?.name ?? 'None yet'}</Text>
+            <Text variant="title">{item.category?.name ?? 'Ninguna todavía'}</Text>
           )}
         </View>
         {!open ? (
           <Button variant="secondary" onPress={openPicker}>
-            Change
+            Cambiar
           </Button>
         ) : null}
       </View>
@@ -94,24 +94,24 @@ export function CategoryPanel({ item, onChange }: { item: Item; onChange: (item:
               {categories.map((c) => (
                 <Option key={c.id} label={c.name} active={item.category?.id === c.id} disabled={busy} onPress={() => choose(c.id)} />
               ))}
-              <Option label="No category" active={!item.category} disabled={busy} onPress={() => choose(null)} />
+              <Option label="Sin categoría" active={!item.category} disabled={busy} onPress={() => choose(null)} />
             </View>
           ) : null}
           <Field
-            label="New category"
+            label="Nueva categoría"
             value={newName}
             onChangeText={setNewName}
-            placeholder="Recipes"
+            placeholder="Recetas"
             maxLength={60}
             onSubmitEditing={createAndChoose}
             returnKeyType="done"
           />
           <View className="flex-row gap-3">
             <Button className="flex-1" onPress={createAndChoose} loading={busy} disabled={!newName.trim()}>
-              Add and move
+              Crear y mover
             </Button>
             <Button variant="ghost" onPress={() => setOpen(false)} disabled={busy}>
-              Cancel
+              Cancelar
             </Button>
           </View>
         </View>

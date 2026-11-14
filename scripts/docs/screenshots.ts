@@ -56,12 +56,12 @@ type Item = { id: string; description: string | null };
 const { items } = (await (await fetch(`${API}/v1/items?limit=100`, { headers: { Authorization: `Bearer ${token}` } })).json()) as {
   items: Item[];
 };
-const featured = items.find((it) => it.description?.startsWith('Hidden ramen bar')) ?? items[0];
+const featured = items.find((it) => it.description?.startsWith('Bar de ramen')) ?? items[0];
 
 await shot(await open('/'), 'library');
 {
   const page = await open('/');
-  await page.getByText('Undescribed', { exact: true }).click();
+  await page.getByText('Sin describir', { exact: true }).click();
   await shot(page, 'inbox');
 }
 await shot(await open(`/item/${featured.id}`), 'item', 1500);
@@ -86,7 +86,7 @@ await shot(await open('/graph'), 'graph', 5000);
 }
 {
   const page = await open(`/share?text=${encodeURIComponent('https://www.instagram.com/reel/C9demo99/')}`);
-  await page.keyboard.type('Pasta e ceci, a cozy weeknight dinner', { delay: 10 });
+  await page.keyboard.type('Pasta e ceci, una cena calentita de semana', { delay: 10 });
   await shot(page, 'share');
 }
 await shot(await open('/credits'), 'credits');

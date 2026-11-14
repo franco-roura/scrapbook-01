@@ -37,7 +37,7 @@ async function register() {
   }
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
-      name: 'Saves',
+      name: 'Guardados',
       importance: AndroidImportance.DEFAULT,
     });
   }

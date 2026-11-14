@@ -45,10 +45,10 @@ export default function RootLayout() {
               headerRight: () => <HeaderActions />,
             }}
           />
-          <Stack.Screen name="sign-in" options={{ title: 'Sign in' }} />
-          <Stack.Screen name="item/[id]" options={{ title: 'Item' }} />
-          <Stack.Screen name="graph" options={{ title: 'Graph' }} />
-          <Stack.Screen name="credits" options={{ title: 'Credits' }} />
+          <Stack.Screen name="sign-in" options={{ title: 'Entrar' }} />
+          <Stack.Screen name="item/[id]" options={{ title: 'Guardado' }} />
+          <Stack.Screen name="graph" options={{ title: 'Mapa' }} />
+          <Stack.Screen name="credits" options={{ title: 'Créditos' }} />
           <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
           <Stack.Screen name="share" options={{ presentation: 'modal', headerShown: false }} />
         </Stack>

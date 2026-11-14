@@ -70,7 +70,7 @@ func (s *Server) getNeighbors(w http.ResponseWriter, r *http.Request) {
 		user, _ := auth.UserFrom(r.Context())
 		it, err := s.q.GetItem(r.Context(), db.GetItemParams{ID: id, UserID: user})
 		if err != nil {
-			writeError(w, http.StatusNotFound, "not_found", "Item not found.")
+			writeError(w, http.StatusNotFound, "not_found", "No encontramos ese guardado.")
 			return
 		}
 		local = graph.Graph{Links: []graph.Link{}, Nodes: []graph.Node{{

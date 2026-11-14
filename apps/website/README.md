@@ -1,6 +1,6 @@
 # Scrapbook/01 website
 
-The landing page and waitlist, in Spanish. Built with [Vite+](https://viteplus.dev) (Vite, Vitest,
+The landing page and waitlist, in Uruguayan Spanish like the app. Built with [Vite+](https://viteplus.dev) (Vite, Vitest,
 Oxlint and Oxfmt behind one `vp` CLI), React and the [Module/01](https://github.com/franco-roura/module-01)
 design system.
 
@@ -20,5 +20,6 @@ bun run build    # dist/, served by CloudFront in production (sst.config.ts, "La
   `Accordion`, `CtaBanner` (with the signup form inside), `Footer` and `Toaster`. One local tweak
   remains: the hero title steps down a size on phones, since "Scrapbook/01" in Michroma is wider
   than a 375px screen at the hero's phone size.
-- **Images:** `public/app.png` (the three-screen hero), `public/og.png` and `public/icon.png` come
-  from `docs/brand`. Re-copy them when those change.
+- **Images:** `public/app.png` is `docs/brand/hero-es.png`, the three-screen hero with Spanish
+  captions (`bun run docs:render` at the root copies it here). `public/og.png` and `public/icon.png`
+  come from `docs/brand`. Re-copy them when those change.

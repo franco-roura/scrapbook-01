@@ -57,7 +57,7 @@ type Options = {
 export function createApi({ baseUrl, getToken, fetch: f = fetch }: Options) {
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const token = await getToken();
-    if (!token) throw new ApiError(401, 'unauthorized', 'Sign in again.');
+    if (!token) throw new ApiError(401, 'unauthorized', 'Volvé a entrar.');
 
     let res: Response;
     try {
@@ -70,14 +70,14 @@ export function createApi({ baseUrl, getToken, fetch: f = fetch }: Options) {
         body: body === undefined ? undefined : JSON.stringify(body),
       });
     } catch {
-      throw new ApiError(0, 'network', "Can't reach Scrapbook/01. Check your connection.");
+      throw new ApiError(0, 'network', 'No llegamos a Scrapbook/01. Revisá tu conexión.');
     }
 
     if (res.status === 204) return undefined as T;
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       const err = data?.error;
-      throw new ApiError(res.status, err?.code ?? 'unknown', err?.message ?? 'Something went wrong.');
+      throw new ApiError(res.status, err?.code ?? 'unknown', err?.message ?? 'Algo salió mal.');
     }
     return data as T;
   }

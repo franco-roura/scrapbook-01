@@ -26,7 +26,7 @@ export default function ItemScreen() {
         setItem(it);
         setDescription(it.description ?? '');
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : 'Something went wrong.'));
+      .catch((e) => setError(e instanceof ApiError ? e.message : 'Algo salió mal.'));
   }, [id]);
 
   // While the server sorts a new description, check back for the category
@@ -56,7 +56,7 @@ export default function ItemScreen() {
       setDescription(updated.description ?? '');
       setError(null);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Something went wrong.');
+      setError(e instanceof ApiError ? e.message : 'Algo salió mal.');
     } finally {
       setSaving(false);
     }
@@ -69,13 +69,13 @@ export default function ItemScreen() {
         await api.deleteItem(item.id);
         router.back();
       } catch (e) {
-        setError(e instanceof ApiError ? e.message : 'Something went wrong.');
+        setError(e instanceof ApiError ? e.message : 'Algo salió mal.');
       }
     };
-    if (Platform.OS === 'web') return void (confirm('Delete this item?') && doDelete());
-    Alert.alert('Delete this item?', "This can't be undone.", [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: doDelete },
+    if (Platform.OS === 'web') return void (confirm('¿Borrar este guardado?') && doDelete());
+    Alert.alert('¿Borrar este guardado?', 'No se puede deshacer.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Borrar', style: 'destructive', onPress: doDelete },
     ]);
   }
 
@@ -94,7 +94,7 @@ export default function ItemScreen() {
       <ScrollView contentContainerClassName="p-6 gap-6" keyboardShouldPersistTaps="handled">
         <HudLabel code="I-01">{platformLabel(item.url)}</HudLabel>
 
-        <Panel serial={`SAVED · ${new Date(item.createdAt).toLocaleDateString()}`} className="gap-4">
+        <Panel serial={`GUARDADO · ${new Date(item.createdAt).toLocaleDateString('es-UY')}`} className="gap-4">
           <View className="flex-row gap-2">
             <Chip>{platformLabel(item.url)}</Chip>
             {item.category ? <Chip tone="signal">{item.category.name}</Chip> : null}
@@ -103,22 +103,22 @@ export default function ItemScreen() {
             {item.url}
           </Text>
           <Button variant="secondary" onPress={() => WebBrowser.openBrowserAsync(item.url)}>
-            Open link
+            Abrir link
           </Button>
         </Panel>
 
         <Panel notch="sm" className="gap-4">
           <Field
-            label="What is it about?"
+            label="¿De qué se trata?"
             value={description}
             onChangeText={setDescription}
-            placeholder="5 dad-daughter traditions to try"
+            placeholder="5 tradiciones para hacer con tu hija"
             multiline
             maxLength={DESCRIPTION_MAX}
             error={error}
           />
           <Button onPress={save} loading={saving} disabled={!changed}>
-            Save description
+            Guardar descripción
           </Button>
         </Panel>
 
@@ -128,7 +128,7 @@ export default function ItemScreen() {
         <LocalGraph itemId={item.id} onOpen={(next) => router.setParams({ id: next })} />
 
         <Button variant="destructive" onPress={remove}>
-          Delete
+          Borrar
         </Button>
       </ScrollView>
     </KeyboardAvoidingView>

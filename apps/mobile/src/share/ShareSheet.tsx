@@ -46,7 +46,7 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
       setState({ kind: 'saved', item });
       savedTimer.current = setTimeout(() => onSaved(item), 700);
     } catch (e) {
-      setState({ kind: 'error', message: e instanceof ApiError ? e.message : 'Something went wrong.' });
+      setState({ kind: 'error', message: e instanceof ApiError ? e.message : 'Algo salió mal.' });
     }
   }
 
@@ -54,22 +54,22 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
     return (
       <Frame>
         <HudLabel code="S-01" plain={plain}>
-          Save to Scrapbook/01
+          Guardar en Scrapbook/01
         </HudLabel>
         <Panel plain={plain} className="mt-4 gap-3">
           <Text variant="title" {...textProps}>
-            Sign in first
+            Primero entrá a tu cuenta
           </Text>
           <Text variant="bodySm" {...textProps}>
-            Open Scrapbook/01 and sign in. After that you can save from any app.
+            Abrí Scrapbook/01 y entrá a tu cuenta. Después vas a poder guardar desde cualquier app.
           </Text>
         </Panel>
         <View className="mt-6 gap-3">
           <Button plain={plain} onPress={onSignIn}>
-            Open Scrapbook/01
+            Abrir Scrapbook/01
           </Button>
           <Button plain={plain} variant="secondary" onPress={onCancel}>
-            Cancel
+            Cancelar
           </Button>
         </View>
       </Frame>
@@ -81,10 +81,10 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
   return (
     <Frame>
       <HudLabel code="S-01" plain={plain}>
-        Save to Scrapbook/01
+        Guardar en Scrapbook/01
       </HudLabel>
 
-      <Panel plain={plain} serial="P-01 · NEW SAVE" className="mt-4 gap-4">
+      <Panel plain={plain} serial="P-01 · NUEVO" className="mt-4 gap-4">
         {url ? (
           <View className="gap-2">
             <Chip plain={plain}>{platformLabel(url)}</Chip>
@@ -105,25 +105,25 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
             autoFocus
             returnKeyType="next"
             onSubmitEditing={() => descriptionRef.current?.focus()}
-            error={manualUrl && !link ? 'Paste a full link, starting with https://' : null}
+            error={manualUrl && !link ? 'Pegá el link completo, que empiece con https://' : null}
           />
         )}
 
         <Field
           ref={descriptionRef}
-          label="What is it about?"
+          label="¿De qué se trata?"
           plain={plain}
           value={description}
           onChangeText={setDescription}
-          placeholder="5 dad-daughter traditions to try"
+          placeholder="5 tradiciones para hacer con tu hija"
           multiline
           maxLength={DESCRIPTION_MAX}
           autoFocus={Boolean(url)}
           editable={!busy}
-          accessibilityHint="Optional. Describe it now or later from your inbox."
+          accessibilityHint="Opcional. Describilo ahora o después desde Sin describir."
         />
         <Text variant="hudSm" {...textProps}>
-          Optional · you can describe it later
+          Opcional · podés describirlo después
         </Text>
       </Panel>
 
@@ -135,10 +135,10 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
 
       <View className="mt-6 gap-3">
         <Button plain={plain} onPress={save} disabled={!link || busy} loading={state.kind === 'saving'}>
-          {state.kind === 'saved' ? 'Saved' : state.kind === 'error' ? 'Try again' : 'Save'}
+          {state.kind === 'saved' ? 'Guardado' : state.kind === 'error' ? 'Probar de nuevo' : 'Guardar'}
         </Button>
         <Button plain={plain} variant="secondary" onPress={onCancel} disabled={busy}>
-          Cancel
+          Cancelar
         </Button>
       </View>
     </Frame>

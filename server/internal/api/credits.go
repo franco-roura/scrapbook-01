@@ -39,7 +39,7 @@ type creditsJSON struct {
 // recent ledger entries.
 func (s *Server) getCredits(w http.ResponseWriter, r *http.Request) {
 	if s.credits == nil {
-		writeError(w, http.StatusNotFound, "not_found", "Credits aren't enabled.")
+		writeError(w, http.StatusNotFound, "not_found", "Los créditos no están activados.")
 		return
 	}
 	user, _ := auth.UserFrom(r.Context())

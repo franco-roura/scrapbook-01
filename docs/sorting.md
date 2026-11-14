@@ -2,7 +2,8 @@
 
 # How saves get sorted
 
-What happens between tapping Save and "Saved to *Japan trip*", and why it costs so little.
+What happens between tapping Guardar (save) and "Guardado en *Viaje a Japón*", and why it costs so
+little.
 
 **On this page:** [The pipeline](#the-pipeline) · [What it costs](#what-it-costs) ·
 [Why not scrape the post?](#why-not-scrape-the-post) · [What never costs anything](#what-never-costs-anything) ·
@@ -22,7 +23,7 @@ flowchart LR
   H --> D{"Close to an<br/>existing name?"}
   D -- "yes" --> F
   D -- "no" --> N["New category"] --> F
-  F --> L["Link to the 5<br/>nearest saves"] --> P["Push: Saved to …"]
+  F --> L["Link to the 5<br/>nearest saves"] --> P["Push: Guardado en …"]
 ```
 
 1. **Embed.** The description becomes a 1536-number vector (`text-embedding-3-small` by default),

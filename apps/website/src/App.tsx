@@ -153,7 +153,7 @@ export default function App() {
               />
             }
             imageShape="wide"
-            serial="S-00 · WAITLIST"
+            serial="S-00 · LISTA DE ESPERA"
           />
           <ul aria-label="Funciona con" className="mt-8 flex flex-wrap gap-2">
             {sources.map((s) => (

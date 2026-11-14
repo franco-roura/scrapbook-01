@@ -1,16 +1,18 @@
 # Scrapbook/01 app (Expo)
 
-Phase 2 of the app plan: the React Native app and the "What is it about?" share sheet. It talks to the Go API in `../../server`.
+Phase 2 of the app plan: the React Native app and the "¿De qué se trata?" (what is it about?) share sheet. It talks to the Go API in `../../server`.
+
+The app is in Uruguayan Spanish (voseo, `es-UY` dates and numbers, dollars shown as `US$`). Strings live in the components; there is no translation layer, since it ships in one language. The server's messages that people can see (errors the app shows, the push notification) are in Spanish too; API contract errors meant for developers stay in English.
 
 - **iOS:** sharing to Scrapbook/01 opens a small sheet on top of the other app (`expo-share-extension`, entry `index.share.js`). The sheet is signed in because the session is kept in the keychain under the app group `group.com.scrapbook01.app`, which the app and the extension share. The extension refreshes the token itself with one HTTP call (`src/lib/session.ts`) and never loads the sign-in code.
 - **Android:** sharing opens the app on the same sheet (`expo-share-intent`, `src/share/AndroidShareListener.tsx` → `src/app/share.tsx`).
-- **In the app:** library (newest first), the "Undescribed" inbox, item screen (describe, open, delete, change category), "Add link", sign-in and sign-out.
+- **In the app:** library (newest first), the "Sin describir" inbox, item screen (describe, open, delete, change category), "Agregar link", sign-in and sign-out.
 - **Sign-in:** WorkOS AuthKit's hosted page, opened in a browser sheet (`src/lib/signIn.ts`, OAuth code flow with PKCE, no secret in the app). People get a 6-digit code by email, sent by WorkOS. Tokens last a few minutes and are refreshed when the API needs one; refresh tokens are single use, so the app and share extension re-read the shared session before refreshing.
-- **Categories (Phase 3):** the server sorts each described item. Rows show "Sorting…" until it's done, and the item screen lets you move it (which stops automatic sorting for that item).
-- **Graph (Phase 4):** "Graph" on the library opens the whole library as a force-directed graph: category hubs in Module/01's category colors, items around them, similar items linked. Tap a node to focus it (rings, crosshair, neighbors highlighted, the rest dimmed). Each item screen shows its connections 1 or 2 hops out; tapping a neighbor swaps the screen to it while the graph keeps its layout. Drawn with `react-force-graph-2d` in an Expo DOM component (`src/graph/GraphCanvas.tsx`), which runs in a web view on phones, with colors from `@franco_roura/module-01`'s `tokens.json`.
+- **Categories (Phase 3):** the server sorts each described item. Rows show "Ordenando…" until it's done, and the item screen lets you move it (which stops automatic sorting for that item).
+- **Graph (Phase 4):** "Mapa" on the library opens the whole library as a force-directed graph: category hubs in Module/01's category colors, items around them, similar items linked. Tap a node to focus it (rings, crosshair, neighbors highlighted, the rest dimmed). Each item screen shows its connections 1 or 2 hops out; tapping a neighbor swaps the screen to it while the graph keeps its layout. Drawn with `react-force-graph-2d` in an Expo DOM component (`src/graph/GraphCanvas.tsx`), which runs in a web view on phones, with colors from `@franco_roura/module-01`'s `tokens.json`.
 - **Connecting an assistant (Phase 5):** AuthKit shows the sign-in and "Allow access?" screens when someone adds Scrapbook/01 to Claude or ChatGPT, so the app has no page for it.
-- **Credits (Phase 6):** "Credits" in the library header shows the model budget left, roughly how many saves it covers, how the 80/20 split works, and recent activity. Buying packs isn't wired to a payment provider yet (the button says "coming soon").
-- **Notifications:** after sign-in the app registers its Expo push token, and the server sends "Saved to *category*". Tapping it opens the item. This needs an EAS project id (`bun x eas-cli init`) and a development build.
+- **Credits (Phase 6):** "Créditos" in the library header shows the model budget left, roughly how many saves it covers, how the 80/20 split works, and recent activity. Buying packs isn't wired to a payment provider yet (the button says "muy pronto").
+- **Notifications:** after sign-in the app registers its Expo push token, and the server sends "Guardado en *category*". Tapping it opens the item. This needs an EAS project id (`bun x eas-cli init`) and a development build.
 
 The UI follows Module/01. Its web components can't run in React Native, so `src/ui/module01.tsx` rebuilds the few parts used here (Panel with a notched corner, HudLabel, Chip, stadium Button, sunken Field), and `global.css` copies its tokens for Uniwind (Tailwind v4 for React Native).
 

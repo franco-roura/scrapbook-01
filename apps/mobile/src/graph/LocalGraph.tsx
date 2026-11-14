@@ -28,9 +28,9 @@ export function LocalGraph({ itemId, onOpen }: { itemId: string; onOpen: (id: st
   const neighbors = graph ? graph.nodes.filter((n) => n.kind === 'item').length - 1 : 0;
 
   return (
-    <Panel notch="sm" serial={`N-01 · ${neighbors} LINKED`} className="gap-3 p-0 pt-6">
+    <Panel notch="sm" serial={`N-01 · ${neighbors} CONECTADOS`} className="gap-3 p-0 pt-6">
       <View className="flex-row items-center justify-between px-6">
-        <Text variant="label">Connections</Text>
+        <Text variant="label">Conexiones</Text>
         <View className="flex-row gap-1 rounded-full bg-shell-recess p-1">
           {([1, 2] as const).map((d) => (
             <Pressable
@@ -41,7 +41,7 @@ export function LocalGraph({ itemId, onOpen }: { itemId: string; onOpen: (id: st
               className={depth === d ? 'rounded-full bg-shell px-3 py-1' : 'rounded-full px-3 py-1'}
             >
               <Text variant="hudSm" className={depth === d ? 'text-ink' : undefined}>
-                {d === 1 ? '1 hop' : '2 hops'}
+                {d === 1 ? '1 paso' : '2 pasos'}
               </Text>
             </Pressable>
           ))}
@@ -60,13 +60,13 @@ export function LocalGraph({ itemId, onOpen }: { itemId: string; onOpen: (id: st
           />
         ) : (
           <View className="flex-1 items-center justify-center">
-            {failed ? <Text variant="bodySm">Couldn’t load connections.</Text> : <ActivityIndicator color={colors.signalInk} />}
+            {failed ? <Text variant="bodySm">No se pudieron cargar las conexiones.</Text> : <ActivityIndicator color={colors.signalInk} />}
           </View>
         )}
       </View>
       {graph && neighbors === 0 ? (
         <Text variant="bodySm" className="px-6 pb-4">
-          No similar items yet. Links appear once items have descriptions.
+          Todavía no hay guardados parecidos. Las conexiones aparecen cuando tus guardados tienen descripción.
         </Text>
       ) : null}
     </Panel>

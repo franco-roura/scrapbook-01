@@ -43,6 +43,12 @@ var stopwords = map[string]bool{
 	"when": true, "where": true, "will": true, "into": true, "about": true, "after": true, "before": true,
 	"they": true, "them": true, "then": true, "than": true, "just": true, "like": true, "also": true,
 	"things": true, "already": true, "minute": true, "minutes": true, "year": true, "best": true,
+	// Spanish
+	"para": true, "como": true, "cómo": true, "desde": true, "entre": true, "sobre": true, "cuando": true,
+	"donde": true, "dónde": true, "todo": true, "toda": true, "esta": true, "este": true, "estos": true,
+	"estas": true, "tiene": true, "porque": true, "antes": true, "después": true, "sola": true, "solo": true,
+	"minutos": true, "días": true, "mejor": true, "mejores": true, "tres": true, "hacer": true, "qué": true,
+	"una": true, "unos": true, "unas": true, "los": true, "las": true, "con": true, "del": true,
 }
 
 func words(s string) []string {

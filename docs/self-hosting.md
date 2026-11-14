@@ -110,7 +110,7 @@ yourself a few dollars, and you pay the AI providers directly.
   `WorkosClientId` matches the app's `EXPO_PUBLIC_WORKOS_CLIENT_ID`.
 - **Queries fail through Neon's pooler** with prepared-statement errors: add
   `default_query_exec_mode=simple_protocol` to the pooled `DatabaseUrl`.
-- **Saves stay "Sorting…":** check the Worker's logs. Saves that failed are retried by the hourly sweep.
+- **Saves stay "Ordenando…" (sorting):** check the Worker's logs. Saves that failed are retried by the hourly sweep.
 
 ---
 

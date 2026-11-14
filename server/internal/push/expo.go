@@ -18,7 +18,7 @@ import (
 
 const defaultEndpoint = "https://exp.host/--/api/v2/push/send"
 
-// Expo sends "Saved to <category>" notifications to a user's devices.
+// Expo sends "Guardado en <category>" notifications to a user's devices.
 type Expo struct {
 	Q           db.Querier
 	AccessToken string // optional; required if the Expo project enforces push security
@@ -52,8 +52,8 @@ func (e *Expo) CategoryAssigned(ctx context.Context, userID, itemID uuid.UUID, c
 	for i, t := range tokens {
 		msgs[i] = message{
 			To:    t,
-			Title: "Saved to " + category,
-			Body:  "Tap to change the category.",
+			Title: "Guardado en " + category,
+			Body:  "Tocá para cambiar la categoría.",
 			Data:  map[string]string{"itemId": itemID.String(), "url": "scrapbook01://item/" + itemID.String()},
 		}
 	}

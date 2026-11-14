@@ -46,7 +46,7 @@ func TestCategoryAssigned(t *testing.T) {
 	if err := e.CategoryAssigned(context.Background(), uuid.New(), item, "Parenting"); err != nil {
 		t.Fatal(err)
 	}
-	if len(sent) != 2 || sent[0].Title != "Saved to Parenting" || sent[1].Data["itemId"] != item.String() {
+	if len(sent) != 2 || sent[0].Title != "Guardado en Parenting" || sent[1].Data["itemId"] != item.String() {
 		t.Fatalf("sent %+v", sent)
 	}
 	if len(q.deleted) != 1 || q.deleted[0] != "ExponentPushToken[b]" {

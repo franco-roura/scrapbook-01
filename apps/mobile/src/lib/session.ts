@@ -97,7 +97,7 @@ export async function authenticate(body: Record<string, string>): Promise<Sessio
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new AuthError(json.error_description ?? json.message ?? `Sign-in failed (${res.status}).`, res.status);
+    throw new AuthError(json.error_description ?? json.message ?? `No se pudo entrar (${res.status}).`, res.status);
   }
   const r = json as AuthResponse;
   return {

@@ -14,7 +14,7 @@ export function HeaderActions() {
     <View className={`flex-row items-center gap-4 ${Platform.OS === 'web' ? 'pr-4' : ''}`}>
       <Pressable accessibilityRole="button" hitSlop={8} onPress={() => router.push('/credits')}>
         <Text variant="label" className="text-signal-ink">
-          Credits
+          Créditos
         </Text>
       </Pressable>
       <Pressable
@@ -26,7 +26,7 @@ export function HeaderActions() {
         }}
       >
         <Text variant="label" className="text-signal-ink">
-          Sign out
+          Salir
         </Text>
       </Pressable>
     </View>

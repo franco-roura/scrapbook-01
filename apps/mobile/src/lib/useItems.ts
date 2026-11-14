@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, type Item, type ItemPage } from './api';
 import { api } from './client';
 
-const message = (e: unknown) => (e instanceof ApiError ? e.message : 'Something went wrong.');
+const message = (e: unknown) => (e instanceof ApiError ? e.message : 'Algo salió mal.');
 
 /** Paged item list with refresh and load-more. Remount (key) to switch lists. */
 export function useItems(undescribed: boolean) {

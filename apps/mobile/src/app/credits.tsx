@@ -6,22 +6,25 @@ import { ApiError, type Credits } from '../lib/api';
 import { api } from '../lib/client';
 import { Button, Chip, HudLabel, Panel, Text, colors } from '../ui/module01';
 
+// Dollars, marked US$ so they aren't read as Uruguayan pesos, with Uruguay's
+// decimal comma.
 const usd = (n: number) => {
   const abs = Math.abs(n);
   const digits = abs >= 1 ? 2 : abs >= 0.01 ? 3 : 5;
-  return `${n < 0 ? '−' : ''}$${abs.toFixed(digits)}`;
+  const amount = abs.toLocaleString('es-UY', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return `${n < 0 ? '−' : ''}US$ ${amount}`;
 };
 
 const kindLabel: Record<Credits['recent'][number]['kind'], string> = {
-  starter: 'Welcome credits',
-  grant: 'Credits added',
-  purchase: 'Pack bought',
-  usage: 'Used',
+  starter: 'Créditos de bienvenida',
+  grant: 'Créditos cargados',
+  purchase: 'Pack comprado',
+  usage: 'Uso',
 };
 
 const stepLabel: Record<string, string> = {
-  classify: 'Sorting a save',
-  search: 'Assistant search',
+  classify: 'Ordenar un guardado',
+  search: 'Búsqueda de tu IA',
 };
 
 export default function CreditsScreen() {
@@ -32,7 +35,7 @@ export default function CreditsScreen() {
     api
       .getCredits()
       .then(setCredits)
-      .catch((e) => setError(e instanceof ApiError ? e.message : 'Something went wrong.'));
+      .catch((e) => setError(e instanceof ApiError ? e.message : 'Algo salió mal.'));
   }, []);
 
   if (!credits) {
@@ -48,36 +51,36 @@ export default function CreditsScreen() {
 
   return (
     <ScrollView className="bg-canvas" contentContainerClassName="p-6 gap-6">
-      <HudLabel code="K-01">Credits</HudLabel>
+      <HudLabel code="K-01">Créditos</HudLabel>
 
-      <Panel serial="K-01 · MODEL BUDGET" className="gap-2">
+      <Panel serial="K-01 · SALDO PARA IA" className="gap-2">
         <Text variant="display">{usd(credits.balanceUsd)}</Text>
         <Text variant="bodySm">
           {empty
-            ? 'You’re out of credits. New saves are kept, but won’t be sorted or linked until you add more.'
-            : `About ${credits.savesLeft.toLocaleString()} more saves sorted and linked.`}
+            ? 'Te quedaste sin créditos. Lo que guardes se conserva, pero no se ordena ni se conecta hasta que cargues más.'
+            : `Te alcanza para unos ${credits.savesLeft.toLocaleString('es-UY')} guardados más.`}
         </Text>
       </Panel>
 
       <Panel notch="sm" className="gap-3">
-        <Text variant="title">How credits work</Text>
+        <Text variant="title">Cómo funcionan los créditos</Text>
         <Text variant="bodySm">
-          {`Packs are prepaid. ${share}% of what you pay goes to the AI models that sort your saves; ${100 - share}% keeps Scrapbook/01 running.`}
+          {`Los packs se pagan por adelantado. El ${share}% de lo que pagás va a los modelos de IA que ordenan tus guardados; el ${100 - share}% mantiene Scrapbook/01 andando.`}
         </Text>
         <Text variant="bodySm">
-          Your own assistant (Claude, ChatGPT) runs on your plan when it reads your library, so it costs you no credits. Only the quick search lookup does.
+          Tu propia IA (Claude, ChatGPT) corre en tu plan cuando lee tu biblioteca, así que no te gasta créditos. Solo la búsqueda rápida, que cuesta casi nada.
         </Text>
-        <Button disabled>Buy credits · coming soon</Button>
+        <Button disabled>Comprar créditos · muy pronto</Button>
       </Panel>
 
       <View className="gap-2">
-        <HudLabel code="K-02">Recent activity</HudLabel>
-        {credits.recent.length === 0 ? <Text variant="bodySm">Nothing yet.</Text> : null}
+        <HudLabel code="K-02">Actividad reciente</HudLabel>
+        {credits.recent.length === 0 ? <Text variant="bodySm">Nada todavía.</Text> : null}
         {credits.recent.map((e, i) => (
           <View key={i} className="flex-row items-center justify-between rounded-md bg-shell px-4 py-3">
             <View className="gap-1">
-              <Text variant="body">{e.kind === 'usage' ? (stepLabel[e.step ?? ''] ?? 'Used') : kindLabel[e.kind]}</Text>
-              <Text variant="hudSm">{new Date(e.createdAt).toLocaleString()}</Text>
+              <Text variant="body">{e.kind === 'usage' ? (stepLabel[e.step ?? ''] ?? 'Uso') : kindLabel[e.kind]}</Text>
+              <Text variant="hudSm">{new Date(e.createdAt).toLocaleString('es-UY')}</Text>
             </View>
             <Chip tone={e.amountUsd > 0 ? 'signal' : 'shell'}>{usd(e.amountUsd)}</Chip>
           </View>

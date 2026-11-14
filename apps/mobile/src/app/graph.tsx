@@ -41,14 +41,14 @@ export default function GraphScreen() {
   return (
     <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.canvas }}>
       <View className="px-6 pb-3">
-        <HudLabel code="G-01">{`${counts.items} items · ${counts.links} links`}</HudLabel>
+        <HudLabel code="G-01">{`${counts.items} guardados · ${counts.links} conexiones`}</HudLabel>
       </View>
 
       {graph.nodes.length === 0 ? (
         <View className="flex-1 items-center justify-center gap-2 p-6">
-          <Text variant="title">Nothing to map yet</Text>
+          <Text variant="title">Todavía no hay nada para mapear</Text>
           <Text variant="bodySm" className="text-center">
-            Save a few things with a description and they’ll show up here, grouped and linked.
+            Guardá algunas cosas con descripción y van a aparecer acá, agrupadas y conectadas.
           </Text>
         </View>
       ) : (
@@ -65,14 +65,14 @@ export default function GraphScreen() {
 
       {focused ? (
         <View className="absolute bottom-8 left-4 right-4">
-          <Panel notch="sm" serial={focused.kind === 'category' ? 'CATEGORY' : platformLabel(focused.platform ? `https://${focused.platform}.com` : '')} className="gap-3">
+          <Panel notch="sm" serial={focused.kind === 'category' ? 'CATEGORÍA' : platformLabel(focused.platform ? `https://${focused.platform}.com` : '')} className="gap-3">
             <Text variant={focused.kind === 'category' ? 'title' : 'body'} numberOfLines={2}>
               {focused.label}
             </Text>
             <View className="flex-row items-center justify-between gap-3">
-              <Chip>{`${focused.degree} links`}</Chip>
+              <Chip>{`${focused.degree} conexiones`}</Chip>
               {focused.kind === 'item' ? (
-                <Button onPress={() => router.push({ pathname: '/item/[id]', params: { id: focused.id } })}>Open</Button>
+                <Button onPress={() => router.push({ pathname: '/item/[id]', params: { id: focused.id } })}>Abrir</Button>
               ) : null}
             </View>
           </Panel>
@@ -80,7 +80,7 @@ export default function GraphScreen() {
       ) : null}
       {graph.truncated ? (
         <Text variant="hudSm" className="px-6 pb-2">
-          Showing your newest 2000 items
+          Se muestran tus 2000 guardados más nuevos
         </Text>
       ) : null}
     </SafeAreaView>
