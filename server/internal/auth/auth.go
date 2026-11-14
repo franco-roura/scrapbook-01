@@ -22,7 +22,10 @@ const DevIssuer = "scrapbook01-dev"
 
 // Issuer is one token issuer the API trusts.
 type Issuer struct {
-	// Issuer is the exact "iss" claim.
+	// Issuer is the exact "iss" claim. Empty makes this the fallback for
+	// tokens whose "iss" matches no other entry: they're accepted on the
+	// signature alone, as WorkOS's SDKs do for session tokens (the keys are
+	// per client id, so only our environment's tokens pass).
 	Issuer string
 	// Keyfunc returns the key that checks a token's signature.
 	Keyfunc jwt.Keyfunc
@@ -44,9 +47,11 @@ func New(issuers ...Issuer) *Verifier {
 	for _, is := range issuers {
 		opts := []jwt.ParserOption{
 			jwt.WithValidMethods(is.Methods),
-			jwt.WithIssuer(is.Issuer),
 			jwt.WithExpirationRequired(),
 			jwt.WithLeeway(30 * time.Second),
+		}
+		if is.Issuer != "" {
+			opts = append(opts, jwt.WithIssuer(is.Issuer))
 		}
 		if len(is.Audiences) > 0 {
 			opts = append(opts, jwt.WithAudience(is.Audiences...))
@@ -103,13 +108,17 @@ func (v *Verifier) Verify(raw string) (uuid.UUID, time.Time, error) {
 	if _, _, err := jwt.NewParser().ParseUnverified(raw, &peek); err != nil {
 		return fail("%v", err)
 	}
-	parser, ok := v.issuers[peek.Issuer]
+	iss := peek.Issuer
+	parser, ok := v.issuers[iss]
 	if !ok {
-		return fail("untrusted issuer %q", peek.Issuer)
+		if parser, ok = v.issuers[""]; !ok {
+			return fail("untrusted issuer %q", iss)
+		}
+		iss = ""
 	}
 	var c tokenClaims
-	if _, err := parser.ParseWithClaims(raw, &c, v.keys[peek.Issuer]); err != nil {
-		return fail("%v", err)
+	if _, err := parser.ParseWithClaims(raw, &c, v.keys[iss]); err != nil {
+		return fail("iss %q: %v", peek.Issuer, err)
 	}
 	if c.SubProfile == "ai_agent" {
 		return fail("agent tokens are not accepted")

@@ -58,7 +58,7 @@ func New(o Options) *Server {
 		s.log = slog.Default()
 	}
 	s.authMW = o.Verifier.Middleware(func(w http.ResponseWriter, r *http.Request, err error) {
-		s.log.DebugContext(r.Context(), "auth rejected", "err", err)
+		s.log.InfoContext(r.Context(), "auth rejected", "err", err)
 		writeError(w, http.StatusUnauthorized, "unauthorized", "Sign in again.")
 	})
 	return s

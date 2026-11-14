@@ -131,6 +131,25 @@ func TestWorkOSSubjectsMapToStableUUIDs(t *testing.T) {
 	}
 }
 
+func TestFallbackIssuerChecksSignatureOnly(t *testing.T) {
+	key := func(*jwt.Token) (any, error) { return secret, nil }
+	v := New(
+		Issuer{Issuer: issuer, Keyfunc: func(*jwt.Token) (any, error) { return []byte("mcp-secret-mcp-secret-mcp-secret-1"), nil }, Methods: []string{"HS256"}, Audiences: []string{audience}},
+		Issuer{Keyfunc: key, Methods: []string{"HS256"}},
+	)
+	odd := hs256(t, claims("user_a", func(c *jwt.RegisteredClaims) {
+		c.Issuer = "https://api.workos.com/user_management/client_123"
+		c.Audience = nil
+	}))
+	if _, err := v.UserID(odd); err != nil {
+		t.Fatalf("session token with another iss: %v", err)
+	}
+	// A known issuer still gets its own key and audience, never the fallback.
+	if _, err := v.UserID(hs256(t, claims("user_a", nil))); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("MCP issuer signed with the session key: err = %v", err)
+	}
+}
+
 func TestTrustsSeveralIssuers(t *testing.T) {
 	key := func(*jwt.Token) (any, error) { return secret, nil }
 	v := New(

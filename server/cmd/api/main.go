@@ -177,10 +177,9 @@ func newVerifier(ctx context.Context, cfg config.Config, log *slog.Logger) (*aut
 		Issuer: cfg.AuthKitDomain, Keyfunc: mcpKeys, Methods: auth.Asymmetric,
 		Audiences: []string{cfg.MCPResource(), cfg.WorkOSClientID},
 	})
-	// WorkOS's docs show the session issuer both with and without the slash.
-	for _, iss := range []string{cfg.WorkOSAPIURL, cfg.WorkOSAPIURL + "/"} {
-		issuers = append(issuers, auth.Issuer{Issuer: iss, Keyfunc: sessionKeys, Methods: auth.Asymmetric})
-	}
+	// Session tokens: like WorkOS's SDKs, check "iss" only when WORKOS_ISSUER
+	// is set; otherwise the per-client signing keys are the check.
+	issuers = append(issuers, auth.Issuer{Issuer: cfg.WorkOSIssuer, Keyfunc: sessionKeys, Methods: auth.Asymmetric})
 	return auth.New(issuers...), nil
 }
 

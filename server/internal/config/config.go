@@ -26,6 +26,9 @@ type Config struct {
 	// AuthKitDomain is the AuthKit origin (e.g. https://abc-123.authkit.app).
 	// It issues the tokens MCP clients (Claude, ChatGPT) use.
 	AuthKitDomain string
+	// WorkOSIssuer, when set, is the exact "iss" of the app's session tokens
+	// (decode one to find it). Unset, tokens are trusted by signature alone.
+	WorkOSIssuer string
 	// DevJWTSecret, for local development only, also accepts HS256 tokens
 	// with issuer "scrapbook01-dev" signed with this secret. When it's set,
 	// the WorkOS settings become optional.
@@ -84,6 +87,7 @@ func Load() (Config, error) {
 		WorkOSClientID:  os.Getenv("WORKOS_CLIENT_ID"),
 		WorkOSAPIURL:    strings.TrimRight(env("WORKOS_API_URL", "https://api.workos.com"), "/"),
 		AuthKitDomain:   strings.TrimRight(os.Getenv("WORKOS_AUTHKIT_DOMAIN"), "/"),
+		WorkOSIssuer:    os.Getenv("WORKOS_ISSUER"),
 		DevJWTSecret:    os.Getenv("DEV_JWT_SECRET"),
 		ShutdownTimeout: 10 * time.Second,
 
