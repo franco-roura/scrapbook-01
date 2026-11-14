@@ -84,13 +84,16 @@ Then, in another terminal:
 bun run docs:seed          # fills the demo library
 bun run docs:screenshots   # writes docs/screenshots/*.png
 bun run docs:diagram       # writes docs/brand/architecture.svg
-bun run docs:render        # renders the icon, map and hero SVGs to PNG
+bun run docs:render        # renders the icon, map, hero and social preview to PNG
 ```
 
 `docs:demo` uses its own database (`scrapbook_demo`, reset each run) and ports 18080, 8788 and 8090, so
 it doesn't disturb a local setup. The SVGs import Google Fonts, which GitHub doesn't load inside SVG
 images; that's why the docs embed the rendered PNGs. Edit the map in
 [`scripts/docs/architecture.ts`](../scripts/docs/architecture.ts) rather than the SVG.
+
+GitHub's link preview image is `docs/brand/social.png`. It isn't picked up from the repository:
+upload it under the repository's **Settings → General → Social preview**.
 
 ---
 

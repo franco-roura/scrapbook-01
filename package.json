@@ -11,7 +11,7 @@
     "docs:seed": "bun scripts/docs/seed.ts",
     "docs:screenshots": "bun scripts/docs/screenshots.ts",
     "docs:diagram": "bun scripts/docs/architecture.ts",
-    "docs:render": "bun scripts/docs/render-svg.ts docs/brand/icon.svg docs/brand/icon.png 512 && bun scripts/docs/render-svg.ts docs/brand/architecture.svg docs/brand/architecture.png 1600 && bun scripts/docs/render-svg.ts docs/brand/hero.svg docs/brand/hero.png 1600"
+    "docs:render": "bun scripts/docs/render-svg.ts docs/brand/icon.svg docs/brand/icon.png 512 && bun scripts/docs/render-svg.ts docs/brand/architecture.svg docs/brand/architecture.png 1600 && bun scripts/docs/render-svg.ts docs/brand/hero.svg docs/brand/hero.png 1600 && bun scripts/docs/render-svg.ts docs/brand/social.svg docs/brand/social.png 1280"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
