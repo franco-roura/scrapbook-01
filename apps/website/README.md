@@ -18,5 +18,9 @@ bun run build    # dist/, served by CloudFront in production (sst.config.ts, "La
 - **Layout:** Module/01's site parts (`NavBar`, `Hero`, `SectionHeader`, `Panel`, `CtaBanner`,
   `Footer`, `Tag`, `Toaster`). The few parts the kit doesn't have yet are in `src/parts.tsx`, built
   from its tokens only so they can move into Module/01 as they are.
+- **Missing from Module/01:** with `bun run dev` running, open `/missing.html` for a temporary
+  gallery of the 10 pieces the site needed and the kit lacks: each one live, the workaround in use,
+  and a suggested API. It's dev only (not in the build); delete `missing.html`,
+  `src/missing.tsx` and `src/MissingPage.tsx` once the kit has them.
 - **Images:** `public/share.png` is the app's share sheet from `docs/screenshots`; `public/og.png`
   and `public/icon.png` come from `docs/brand`. Re-copy them when those change.

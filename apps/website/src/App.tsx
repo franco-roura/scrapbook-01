@@ -4,16 +4,7 @@ import { CtaBanner, Footer, Hero, Tag } from "@franco_roura/module-01/site";
 import { ChatExchange, CompareList, FaqItem, ShareBar } from "./parts";
 import { WaitlistForm } from "./WaitlistForm";
 
-const sources = [
-  "Instagram",
-  "TikTok",
-  "YouTube",
-  "X",
-  "Facebook",
-  "WhatsApp",
-  "Telegram",
-  "Cualquier web",
-];
+const sources = ["Instagram", "TikTok", "YouTube", "X", "Facebook", "WhatsApp", "Cualquier link"];
 
 const pains = [
   {
@@ -24,7 +15,10 @@ const pains = [
     title: "Nunca lo encontrás",
     text: "Sabés que lo guardaste, pero no en qué app ni en qué carpeta.",
   },
-  { title: "Desaparece", text: "La cuenta se cerró, el post se borró, y tu guardado quedó vacío." },
+  {
+    title: "No te acordás qué era",
+    text: "Un link pelado no dice nada. Para cuando lo abrís, ya no sabés por qué lo guardaste.",
+  },
   {
     title: "Te olvidás de que existía",
     text: "El restaurante que querías probar, el tip para tus anuncios: guardado y perdido.",
@@ -34,45 +28,53 @@ const pains = [
 const steps = [
   {
     title: "Compartí desde cualquier app",
-    text: "Tocás “compartir” como siempre y lo mandás a tu biblioteca. Un toque, sin pensar dónde va.",
+    text: "Tocás “compartir” y elegís Scrapbook/01. Se abre encima de la app en la que estás, con el link ya puesto.",
   },
   {
-    title: "Lo respaldamos y lo entendemos",
-    text: "Guardamos el contenido y su idea central: qué dice, qué lugar es, qué tip da. Y lo etiquetamos solos.",
+    title: "Contá de qué se trata",
+    text: "Una línea con tus palabras: “parrilla en Palermo”, “rutina de 20 minutos”. Podés dictarla o dejarla para después.",
   },
   {
-    title: "Vuelve cuando importa",
-    text: "Tu IA (Claude, ChatGPT u otra) se conecta a tu biblioteca y te lo trae en el momento justo.",
+    title: "Se ordena y se conecta solo",
+    text: "Va a una de tus categorías, o a una nueva si no encaja en ninguna, y se enlaza con lo parecido. Te avisamos dónde quedó.",
   },
 ];
 
 const examples = [
   {
-    you: "Estoy armando el viaje a Buenos Aires",
-    ai: "Guardaste 9 reels de BA: 4 restaurantes, 2 bares en Palermo y un tip para cambiar plata. ¿Te los sumo al itinerario?",
+    you: "¿Qué restaurantes de Buenos Aires tenía guardados?",
+    ai: "Tenés 4 en “Viaje a Buenos Aires”: una parrilla en Palermo, dos bodegones y un bar de vermut. ¿Te los ordeno por barrio?",
   },
   {
-    you: "Ayudame con los anuncios de mi emprendimiento",
-    ai: "Antes de arrancar: tenés 6 videos guardados sobre anuncios. Te resumo los 3 consejos que más se repiten.",
+    you: "¿Qué guardé sobre anuncios para mi emprendimiento?",
+    ai: "Encontré 6 videos sobre anuncios. Te resumo los 3 consejos que más se repiten.",
   },
   {
-    you: "¿Dónde ceno hoy?",
-    ai: "Hace dos meses guardaste un reel de una parrilla a 10 cuadras tuyas que querías probar.",
+    you: "Busco una cena rápida para hoy, ¿tengo algo guardado?",
+    ai: "En “Cenas de semana” tenés un curry de garbanzos de 25 minutos y unos ñoquis al horno. ¿Te paso los links?",
   },
 ];
 
 const faqs = [
   {
     q: "¿Con qué IA funciona?",
-    a: "Con la que ya usás. Te conectás desde Claude, ChatGPT u otras compatibles con conectores (MCP), y tus guardados pasan a ser parte de su memoria.",
+    a: "Con la que ya usás. La conectás desde Claude, ChatGPT u otras compatibles con conectores (MCP) y le preguntás por tus guardados cuando quieras. Lo que tu IA piensa corre en tu propio plan, no en tus créditos.",
   },
   {
     q: "¿Qué puedo guardar?",
-    a: "Reels, TikToks, videos de YouTube, posts de X o Facebook, mensajes reenviados de WhatsApp o Telegram y cualquier página web.",
+    a: "Cualquier link que se pueda compartir: reels, TikToks, videos de YouTube, posts de X o Facebook, links que te llegan por WhatsApp y cualquier página web.",
+  },
+  {
+    q: "¿Leen mis posts?",
+    a: "No. Guardamos el link y la línea que escribiste vos; nunca entramos a la red social a leer el contenido. Por eso funciona igual con cualquier app.",
+  },
+  {
+    q: "¿Qué pasa si el post se borra?",
+    a: "El link deja de abrir, pero tu nota y su categoría quedan: sabés qué era y por dónde buscarlo.",
   },
   {
     q: "¿Quién ve mis guardados?",
-    a: "Solo vos y la IA que vos conectes. Tu biblioteca es privada.",
+    a: "Solo vos y la IA que conectes. Tu biblioteca es privada, y para desconectar tu IA alcanza con quitar el conector.",
   },
   {
     q: "¿Cuándo lo puedo usar?",
@@ -118,9 +120,9 @@ export default function App() {
                 <strong className="text-ink">
                   Guardaste mil cosas “para después”. ¿Cuándo es después?
                 </strong>{" "}
-                Compartí cualquier reel, TikTok, post o link. Nosotros respaldamos el contenido, lo
-                ordenamos solos y tu IA te lo trae justo cuando lo necesitás, sin que tengas que
-                buscarlo.
+                Compartí cualquier reel, TikTok, post o link y escribí en una línea de qué se trata.
+                Se ordena solo en tus categorías, se conecta con lo que ya guardaste y tu IA lo
+                encuentra cuando se lo pedís.
               </>
             }
             actions={
@@ -176,7 +178,7 @@ export default function App() {
             as="h2"
             code="S-02"
             label="Cómo funciona"
-            title="Compartí, olvidate, y listo"
+            title="Compartí, contá y listo"
             ruler
           />
           <ol className="mt-12 grid gap-8 md:grid-cols-3">
@@ -211,33 +213,31 @@ export default function App() {
           />
           <div className="mt-12 grid gap-8 md:grid-cols-2">
             <Panel serial="D-01" hinge="32px" bodyClassName="p-8 pt-12">
-              <p className="hud text-signal-ink">No guardamos links. Guardamos ideas.</p>
+              <p className="hud text-signal-ink">Tus palabras, no un robot</p>
               <h3 className="mt-4 font-display text-display-sm text-ink">
-                Si el post desaparece, vos no lo perdés
+                Lo encontrás por lo que es
               </h3>
               <p className="mt-3 text-body-md text-ink-soft">
-                Otras apps guardan el enlace. Nosotros respaldamos el contenido y extraemos lo que
-                importa: el lugar, la receta, el consejo, el dato. Aunque el original se borre, la
-                idea queda tuya.
+                No leemos los posts ni adivinamos por el link: vos contás de qué se trata en una
+                línea. Por eso funciona con cualquier app, y cada guardado se ordena por lo que
+                realmente es.
               </p>
               <CompareList
-                instead="Un link que mañana puede dar error"
-                get="El contenido respaldado y resumido en una línea"
+                instead="Un link pelado que no dice qué era"
+                get="Tu nota, una categoría y lo que se le parece"
               />
             </Panel>
             <Panel serial="D-02" hinge="65%" bodyClassName="p-8 pt-12">
-              <p className="hud text-signal-ink">Tu IA se acuerda por vos</p>
-              <h3 className="mt-4 font-display text-display-sm text-ink">
-                No tenés que ponerte a buscar
-              </h3>
+              <p className="hud text-signal-ink">Con la IA que ya usás</p>
+              <h3 className="mt-4 font-display text-display-sm text-ink">Preguntale a tu IA</h3>
               <p className="mt-3 text-body-md text-ink-soft">
-                Nuestro conector para tu IA no espera a que le preguntes. Está atento a lo que estás
-                haciendo y aparece con lo que guardaste justo cuando te sirve, incluso cuando menos
-                lo esperás.
+                Conectás Claude, ChatGPT u otra compatible con MCP y le preguntás por lo que
+                guardaste. Busca en tu biblioteca, abre lo que encuentra y te muestra lo
+                relacionado. Lo que piensa corre en tu propio plan: no te cobramos tokens.
               </p>
               <CompareList
-                instead="Una carpeta más que tenés que revisar"
-                get="Tus guardados aparecen solos en la conversación"
+                instead="Buscar a mano en cinco apps"
+                get="Preguntás en tu chat y te lo trae"
               />
             </Panel>
           </div>
@@ -258,9 +258,10 @@ export default function App() {
           />
           <div className="mt-12 grid items-center gap-8 md:grid-cols-[1.1fr_0.9fr]">
             <p className="text-body-lg text-ink-soft">
-              Sin suscripción que te olvidás de cancelar. Comprás packs de créditos de IA y los usás
-              para procesar tus guardados. Nosotros elegimos y optimizamos los mejores modelos para
-              que cada crédito rinda.
+              Sin suscripción que te olvidás de cancelar. Comprás packs de créditos de IA y se usan
+              para ordenar y conectar tus guardados. Cada uno cuesta una fracción de centavo, así
+              que un pack rinde miles. Lo que hace tu propia IA corre en tu plan, no en tus
+              créditos.
             </p>
             <Panel serial="K-01 · 80/20" cross bodyClassName="flex flex-col gap-4 p-8 pt-12">
               <p className="text-label text-ink">De cada peso que gastás en créditos</p>
@@ -274,7 +275,7 @@ export default function App() {
               <ul className="grid gap-1 text-body-sm text-ink-soft">
                 <li>
                   <span aria-hidden className="mr-2 inline-block size-2.5 rounded-xs bg-ink" />
-                  80%: va directo a los modelos de IA que ordenan tu contenido.
+                  80%: va directo a los modelos de IA que ordenan y conectan tus guardados.
                 </li>
                 <li>
                   <span aria-hidden className="mr-2 inline-block size-2.5 rounded-xs bg-signal" />
@@ -310,7 +311,6 @@ export default function App() {
 
         <div className={section}>
           <CtaBanner
-            id="lista"
             code="S-06 · LISTA DE ESPERA"
             title="Lo que guardaste, cuando lo necesitás."
             text="Sumate a la lista y asegurá tu lugar entre los primeros 1.000."
