@@ -1,77 +1,117 @@
-# Deploying Scrapbook/01 to AWS
+[← README](../README.md) · [Features](features.md) · [Getting started](getting-started.md) · [Sorting](sorting.md) · [AI assistants](ai-assistants.md) · **Self-hosting** · [Architecture](architecture.md) · [Development](development.md)
 
-The whole stack is defined in [`sst.config.ts`](sst.config.ts) with [SST](https://sst.dev). At hobby scale it costs about $0 a month. Local development doesn't use any of it: `go run ./cmd/api` in `server/` still runs everything in one process.
+# Host it yourself on AWS
 
-## What gets deployed
+The whole stack is defined in [`sst.config.ts`](../sst.config.ts) with [SST](https://sst.dev) and
+deploys to your own AWS account with one command. At personal scale it costs about two cents a month
+(see [what it costs](architecture.md#what-it-costs)).
 
-| Piece | Where | Cost at hobby scale |
-|---|---|---|
-| API + MCP (`server/cmd/lambda-api`) | Lambda (Go, arm64) behind an API Gateway HTTP API | Lambda's always-free tier (1M requests, 400k GB-s a month). HTTP API: $1 per million requests |
-| Classification (`server/cmd/lambda-worker`) | Lambda, invoked asynchronously by the API for each save. Lambda retries failures twice | Lambda free tier |
-| Hourly sweep (missed items, credit top-ups) | EventBridge Scheduler → the worker | Free (14M a month) |
-| Web app (Expo web build of `apps/mobile`) | S3 + CloudFront | CloudFront's always-free tier (1 TB, 10M requests) |
-| Landing page (`site/index.html`) | S3 + CloudFront | Same |
-| Postgres + pgvector | [Neon](https://neon.com) free tier, outside AWS | $0: 100 compute-hours a month, 1 GB storage per project, sleeps after 5 minutes idle |
-| Logs | CloudWatch, kept 1 week | 5 GB a month free |
+**On this page:** [What you need](#what-you-need) · [One-time setup](#one-time-setup) ·
+[Deploy](#deploy) · [After the first deploy](#after-the-first-deploy) · [Check it works](#check-it-works) ·
+[Credits](#credits) · [Updates, stages and removal](#updates-stages-and-removal) ·
+[Troubleshooting](#troubleshooting)
 
-Nothing runs (or bills) while idle: there's no VPC, NAT gateway, load balancer or database instance.
+## What you need
 
-**What would start costing money:**
-- Neon past 100 compute-hours a month. Anything that queries it more than about every 5 minutes, all day, keeps it awake (that's why the sweep is hourly, not every minute).
-- Adding a VPC (a NAT gateway is about $32 a month).
-- Real traffic: about $1 per million API requests, plus Lambda time past the free tier.
+- An **AWS account**, with credentials on your machine (`aws configure`, an SSO profile or
+  `AWS_PROFILE`). SST uses the standard AWS credential chain.
+- A free **[Neon](https://neon.com)** project, for Postgres.
+- A **[WorkOS](https://workos.com)** environment, for sign-in. The sandbox works for trying it; use a
+  production environment for real users.
+- Go, Bun, and this repository.
+- AI keys, all optional: [Jev](https://typesafe.ai), an OpenAI-compatible embeddings API
+  ([OpenRouter](https://openrouter.ai) by default) and [Anthropic](https://console.anthropic.com).
 
 ## One-time setup
 
-1. **AWS credentials.** Create an IAM user (or SSO profile) that can deploy, and configure it locally (`aws configure`, or `AWS_PROFILE`). SST uses the standard AWS credential chain.
-2. **Neon.** Create a free project in **AWS us-east-1**, the same region as the Lambdas. On the dashboard's Connect panel, copy two connection strings:
-   - the **pooled** one (host contains `-pooler`), for the Lambdas;
-   - the **direct** one, for migrations (they need a session, which the pooler doesn't give).
+1. **Neon.** Create a project in **AWS us-east-1**, the region the Lambdas run in. From its Connect
+   panel, copy two connection strings:
+   - the **pooled** one (the host contains `-pooler`): the Lambdas use it;
+   - the **direct** one: migrations use it, since they need a session the pooler doesn't keep.
 
-   pgvector needs no setup: the first migration runs `CREATE EXTENSION vector`.
-3. **Install** (repo root):
+   pgvector needs no setup: the first migration enables it.
+2. **Install** (repository root):
    ```bash
    bun install
    ```
-4. **Secrets** for the `prod` stage. The three required ones:
+3. **Secrets**, for the `prod` stage. Three are required:
    ```bash
-   bun sst secret set DatabaseUrl "postgres://...-pooler.../neondb?sslmode=require" --stage prod
-   bun sst secret set WorkosClientId client_... --stage prod
+   bun sst secret set DatabaseUrl "postgres://…-pooler…/neondb?sslmode=require" --stage prod
+   bun sst secret set WorkosClientId client_… --stage prod
    bun sst secret set WorkosAuthkitDomain https://<yours>.authkit.app --stage prod
    ```
-   Optional ones (leave unset to turn that step off): `TypesafeApiKey`, `EmbeddingsApiKey`, `AnthropicApiKey`, `ExpoAccessToken`.
-5. **Deploy.** Migrations run first, against the direct URL:
-   ```bash
-   MIGRATE_DATABASE_URL="postgres://...direct.../neondb?sslmode=require" bun run deploy
-   ```
-   The first deploy takes a few minutes, mostly CloudFront. It prints `api`, `web` and `landing` URLs.
-6. **WorkOS**, using those URLs. In Sandbox while testing, in Production when going live:
-   - Redirects: add `<web>/auth/callback`.
-   - Sessions → CORS: add `<web>`.
-   - Connect → Resource Indicators: add `<api>/mcp` as the default.
-   - Connect → Configuration: Client ID Metadata Documents and dynamic client registration on.
+   The rest are optional; leaving one unset turns its step off: `TypesafeApiKey`, `EmbeddingsApiKey`,
+   `AnthropicApiKey`, `ExpoAccessToken`. The first `sst secret set` also creates SST's state storage
+   in your account.
 
-## Every later deploy
+## Deploy
 
 ```bash
-MIGRATE_DATABASE_URL="postgres://...direct..." bun run deploy
+MIGRATE_DATABASE_URL="postgres://…direct…/neondb?sslmode=require" bun run deploy
 ```
 
-`bun run diff` previews the changes. A `dev` stage (`bun sst deploy --stage dev`, with its own secrets) is a full separate copy; remove it with `bun sst remove --stage dev`. The `prod` stage is protected from `sst remove` and keeps its resources if removed from the config.
+`bun run deploy` applies the migrations first (`server/cmd/migrate`, against the direct URL), then runs
+`sst deploy --stage prod`. The first deploy takes a few minutes, mostly CloudFront, and ends by printing
+three URLs: `api`, `web` and `landing`.
 
-## Checking it works
+## After the first deploy
 
-1. `curl <api>/healthz` returns `{"status":"ok"}` (the first call after a quiet spell is slower: Lambda and Neon both wake up).
-2. Open `<web>`, sign in, save a link with a description. It gets a category within seconds. The worker's logs are in CloudWatch, under the log group of the `Worker` function.
+Tell WorkOS about the new addresses:
+
+- **Redirects:** add `<web>/auth/callback`.
+- **Authentication → Sessions → CORS:** add `<web>`.
+- **Connect → Resource Indicators:** add `<api>/mcp` as the default.
+- **Connect → Configuration:** turn on Client ID Metadata Documents and dynamic client registration.
+
+For the phone builds, set `EXPO_PUBLIC_API_URL=<api>` when building, and add
+`scrapbook01://auth/callback` to the redirects.
+
+## Check it works
+
+1. `curl <api>/healthz` returns `{"status":"ok"}`. The first call after a quiet spell is slower, since
+   both the Lambda and Neon wake up.
+2. Open `<web>`, sign in, and save a link with a description. It gets a category within seconds.
 3. `<api>/.well-known/oauth-protected-resource/mcp` names your AuthKit domain.
-4. In Claude: Settings → Connectors → Add custom connector → `<api>/mcp`.
+4. Connect Claude to `<api>/mcp` (see [AI assistants](ai-assistants.md)).
 
-## How it maps to the local setup
+Logs are in CloudWatch, one log group per function (`Api…` and `Worker…`), kept for a week.
 
-| | Local (`go run ./cmd/api`) | AWS |
-|---|---|---|
-| Entry point | `server/cmd/api` | `server/cmd/lambda-api`, `server/cmd/lambda-worker` |
-| Shared wiring | `server/internal/app` | same |
-| Background jobs | River, in Postgres, in the same process | Async Lambda invoke + hourly sweep |
-| Migrations | on start | `server/cmd/migrate`, before each deploy |
-| Settings | `server/.env` | SST secrets, passed as environment variables |
+## Credits
+
+Sorting is metered against prepaid credits. New users get `STARTER_CREDITS_USD` ($0.10 by default).
+Until a payment provider is wired in, grant or record purchases from your machine, against the direct
+database URL:
+
+```bash
+cd server
+DATABASE_URL="postgres://…direct…" go run ./cmd/credits balance  -user user_01H…
+DATABASE_URL="postgres://…direct…" go run ./cmd/credits grant    -user user_01H… -usd 1 -note "friend"
+DATABASE_URL="postgres://…direct…" go run ./cmd/credits purchase -user user_01H… -price 5 -pack starter -ref <payment id>
+```
+
+`-user` takes the WorkOS user id (shown in the WorkOS dashboard). A purchase adds 80% of the price as
+model budget, and a payment reference only ever counts once. Hosting it just for yourself? Grant
+yourself a few dollars, and you pay the AI providers directly.
+
+## Updates, stages and removal
+
+- **Update:** pull, then run the same deploy command. Migrations run first, so for a moment the
+  old code runs on the new schema; that's why migrations here only add, never rename or drop.
+- **Preview:** `bun run diff` shows what a deploy would change.
+- **A second copy:** `bun sst deploy --stage dev` deploys a separate stage with its own secrets (set
+  them with `--stage dev`). Remove it with `bun sst remove --stage dev`.
+- **The prod stage is protected:** `sst remove` refuses it, and its resources are kept if they're ever
+  dropped from the config.
+
+## Troubleshooting
+
+- **Sign-in fails with a CORS error in the browser:** the web address isn't on WorkOS's CORS list.
+- **The API answers 401 to the app:** its log has an "auth rejected" line with the reason. Check
+  `WorkosClientId` matches the app's `EXPO_PUBLIC_WORKOS_CLIENT_ID`.
+- **Queries fail through Neon's pooler** with prepared-statement errors: add
+  `default_query_exec_mode=simple_protocol` to the pooled `DatabaseUrl`.
+- **Saves stay "Sorting…":** check the Worker's logs. Saves that failed are retried by the hourly sweep.
+
+---
+
+[← AI assistants](ai-assistants.md) · Next: [Architecture and costs →](architecture.md)

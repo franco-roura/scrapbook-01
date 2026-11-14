@@ -9,7 +9,7 @@ After a save or a description edit, a [River](https://riverqueue.com) job (store
 1. **Embed** the description (one small embedding) and store it with pgvector.
 2. **Jev** (TypeSafe, `POST /v1/systemone`) picks among the user's categories, each described by a few recent items. It must reach `JEV_THRESHOLD` confidence, and it can answer "None of these".
 3. Only if nothing fits, **Claude Haiku** (`claude-haiku-5-5`, low effort) names a new category in the description's language. If that name's embedding is very close to an existing category's (≥ 0.85), the existing one is used instead.
-4. **Graph links**: the 5 nearest items by cosine similarity (≥ 0.45) become `edges`.
+4. **Graph links**: the 5 nearest items by cosine similarity (at least `GRAPH_MIN_SIMILARITY`, 0.45 by default) become `edges`.
 5. A push notification ("Saved to *Parenting*") goes to the user's phones through Expo.
 
 Re-saving a link without a new description, or a category the user picked themselves, costs nothing: `described_at` only moves when the text changes, and `category_source = 'user'` is never overwritten. Corrections are stored in `category_feedback` for tuning. A sweep every minute re-queues anything missed, including items that waited for a credit top-up. Each missing key turns its step off (with a warning) instead of failing the boot.
@@ -28,7 +28,7 @@ Sign-in is [WorkOS AuthKit](https://workos.com/docs/authkit). Requests carry an 
 
 ## Deploy
 
-On AWS it runs as Lambdas (`cmd/lambda-api`, `cmd/lambda-worker`) with Neon for Postgres, for about $0 a month. See [DEPLOY.md](../DEPLOY.md).
+On AWS it runs as Lambdas (`cmd/lambda-api`, `cmd/lambda-worker`) with Neon for Postgres, for about $0 a month. See [docs/self-hosting.md](../docs/self-hosting.md).
 
 ## Endpoints
 
