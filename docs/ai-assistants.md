@@ -11,7 +11,11 @@ Claude, ChatGPT or any MCP client, and your assistant can look things up in what
 
 ## Connect it
 
-The server is at `https://<your API>/mcp`.
+The quickest way is in the app: **Conectar IA** in the library header. **Agregar a Claude** opens
+Claude's "Add custom connector" dialog already filled in, so you only tap Add. ChatGPT has no install
+link, so **Copiar link y abrir ChatGPT** copies the server URL and opens ChatGPT for you to paste it.
+
+To do it by hand, the server is at `https://<your API>/mcp`.
 
 - **Claude:** Settings → Connectors → **Add custom connector**, and paste the URL.
 - **ChatGPT, Claude Code and other MCP clients:** add it as a remote MCP server (Streamable HTTP)

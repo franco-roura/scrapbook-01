@@ -49,6 +49,7 @@ export default function RootLayout() {
           <Stack.Screen name="item/[id]" options={{ title: 'Guardado' }} />
           <Stack.Screen name="graph" options={{ title: 'Mapa' }} />
           <Stack.Screen name="credits" options={{ title: 'Créditos' }} />
+          <Stack.Screen name="connect-ai" options={{ title: 'Conectar IA' }} />
           <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
           <Stack.Screen name="share" options={{ presentation: 'modal', headerShown: false }} />
         </Stack>

@@ -1,4 +1,5 @@
 // Prepaid AI credits: what's left, what it buys, and where it went.
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 
@@ -70,6 +71,9 @@ export default function CreditsScreen() {
         <Text variant="bodySm">
           Tu propia IA (Claude, ChatGPT) corre en tu plan cuando lee tu biblioteca, así que no te gasta créditos. Solo la búsqueda rápida, que cuesta casi nada.
         </Text>
+        <Button variant="ghost" onPress={() => router.push('/connect-ai')}>
+          Conectar tu IA
+        </Button>
         <Button disabled>Comprar créditos · muy pronto</Button>
       </Panel>
 
