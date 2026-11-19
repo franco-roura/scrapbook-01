@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+### Patch Changes
+
+- [#8](https://github.com/franco-roura/scrapbook-01/pull/8) [`75460a9`](https://github.com/franco-roura/scrapbook-01/commit/75460a90d4f5666c58f7fd356d9b9bed6648f85b) Thanks [@franco-roura](https://github.com/franco-roura)! - Dependency updates: pgx 5.13, goose 3.30.1, keyfunc 3.9.2 and the Anthropic Go SDK 2.10 in the API; the latest Expo SDK 58 patches and Module/01 1.1.0 in the app; Tailwind 4.3.5, lucide-react 1.73 and Vite+ 1.6 on the landing page.
+
 ## 0.1.0
 
 The first public release. Early: the API, the MCP server, sorting, credits and the web app are tested
