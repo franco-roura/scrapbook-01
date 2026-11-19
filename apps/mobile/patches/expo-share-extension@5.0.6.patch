@@ -1,0 +1,90 @@
+diff --git a/node_modules/expo-share-extension/.bun-tag-8d22010c475a1dfd b/.bun-tag-8d22010c475a1dfd
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/expo-share-extension/.bun-tag-8f0cb440aed54d63 b/.bun-tag-8f0cb440aed54d63
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/expo-share-extension/.bun-tag-94fdcd1b2fb16765 b/.bun-tag-94fdcd1b2fb16765
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/plugin/build/xcode/addToXCConfigurationList.js b/plugin/build/xcode/addToXCConfigurationList.js
+index 3816339ae033c7b49c7d683d4c432888d5080788..10c9c6588504572c85cc46355decdbc62a3b90dd 100644
+--- a/plugin/build/xcode/addToXCConfigurationList.js
++++ b/plugin/build/xcode/addToXCConfigurationList.js
+@@ -6,7 +6,9 @@ function addXCConfigurationList(xcodeProject, { targetName, currentProjectVersio
+         CLANG_ENABLE_MODULES: "YES",
+         CURRENT_PROJECT_VERSION: `"${currentProjectVersion}"`,
+         INFOPLIST_FILE: `${targetName}/Info.plist`,
+-        IPHONEOS_DEPLOYMENT_TARGET: `"15.1"`,
++        // Match the app (Expo SDK 58: iOS 16.4). The extension imports Expo,
++        // whose module refuses to compile for an older deployment target.
++        IPHONEOS_DEPLOYMENT_TARGET: `"16.4"`,
+         LD_RUNPATH_SEARCH_PATHS: `"$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"`,
+         PRODUCT_BUNDLE_IDENTIFIER: `"${bundleIdentifier}"`,
+         PRODUCT_NAME: `"${targetName}"`,
+diff --git a/plugin/swift/ShareExtensionViewController.swift b/plugin/swift/ShareExtensionViewController.swift
+index 7f9f6d84323d9fdcc80b23a661f76af8dd8bf793..fbaed269b8b0119b8c84e71c8160663755b57a50 100644
+--- a/plugin/swift/ShareExtensionViewController.swift
++++ b/plugin/swift/ShareExtensionViewController.swift
+@@ -2,6 +2,12 @@ import UIKit
+ import React
+ import React_RCTAppDelegate
+ import ReactAppDependencyProvider
++// Expo SDK 58 installs `globalThis.expo` (EventEmitter, NativeModule, ...) only
++// from ExpoReactNativeFactory. A plain RCTReactNativeFactory leaves it undefined
++// and every Expo module's JS throws at load.
++// `internal` to match the generated ExpoModulesProvider.swift in this target;
++// Swift rejects mixed access levels for the same import.
++internal import Expo
+ import AVFoundation
+ import UniformTypeIdentifiers
+ // if react native firebase is installed, we import and configure it
+@@ -12,7 +18,7 @@ import FirebaseCore
+ import FirebaseAuth
+ #endif
+ 
+-class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
++class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
+   override func sourceURL(for bridge: RCTBridge) -> URL? {
+     self.bundleURL()
+   }
+@@ -98,7 +104,7 @@ class ShareExtensionViewController: UIViewController {
+       
+       reactNativeFactoryDelegate = ReactNativeDelegate()
+       reactNativeFactoryDelegate!.dependencyProvider = RCTAppDependencyProvider()
+-      reactNativeFactory = RCTReactNativeFactory(delegate: reactNativeFactoryDelegate!)
++      reactNativeFactory = ExpoReactNativeFactory(delegate: reactNativeFactoryDelegate!)
+       
+       var initialProps = sharedData ?? [:]
+       
+@@ -140,24 +146,12 @@ class ShareExtensionViewController: UIViewController {
+   private func configureRootView(_ rootView: UIView, withBackgroundColorDict dict: [String: CGFloat]?, withHeight: CGFloat?) {
+     rootView.backgroundColor = backgroundColor(from: dict)
+ 
+-    // Get the screen bounds
+-    let screenBounds = UIScreen.main.bounds
+-
+-    // Calculate proper frame
+-    let frame: CGRect
+-    if let withHeight = withHeight {
+-      rootView.autoresizingMask = [.flexibleWidth, .flexibleTopMargin]
+-      frame = CGRect(
+-        x: 0,
+-        y: screenBounds.height - withHeight,
+-        width: screenBounds.width,
+-        height: withHeight
+-      )
+-    } else {
+-      rootView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+-      frame = screenBounds
+-    }
+-    rootView.frame = frame
++    // Fill this controller's view, not the screen. iOS presents the extension
++    // as a sheet whose view starts partway down the screen, so a frame computed
++    // from UIScreen bounds (`screenHeight - height`, or the full screen) puts the
++    // content below the visible area. `withHeight` is ignored for that reason.
++    rootView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
++    rootView.frame = view.bounds
+   }
+   
+   private func setupLoadingIndicator() {

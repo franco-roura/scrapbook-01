@@ -52,7 +52,7 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
 
   if (!signedIn) {
     return (
-      <Frame>
+      <Frame plain={plain}>
         <HudLabel code="S-01" plain={plain}>
           Guardar en Scrapbook/01
         </HudLabel>
@@ -79,7 +79,7 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
   const busy = state.kind === 'saving' || state.kind === 'saved';
 
   return (
-    <Frame>
+    <Frame plain={plain}>
       <HudLabel code="S-01" plain={plain}>
         Guardar en Scrapbook/01
       </HudLabel>
@@ -102,7 +102,7 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
-            autoFocus
+            autoFocus={!plain}
             returnKeyType="next"
             onSubmitEditing={() => descriptionRef.current?.focus()}
             error={manualUrl && !link ? 'Pegá el link completo, que empiece con https://' : null}
@@ -118,7 +118,9 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
           placeholder="5 tradiciones para hacer con tu hija"
           multiline
           maxLength={DESCRIPTION_MAX}
-          autoFocus={Boolean(url)}
+          // The iOS extension's sheet is short: an open keyboard would cover
+          // the buttons before the person has seen them.
+          autoFocus={Boolean(url) && !plain}
           editable={!busy}
           accessibilityHint="Opcional. Describilo ahora o después desde Sin describir."
         />
@@ -145,12 +147,25 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
   );
 }
 
-function Frame({ children }: { children: React.ReactNode }) {
+function Frame({ children, plain }: { children: React.ReactNode; plain?: boolean }) {
+  const scroll = (
+    <ScrollView
+      contentContainerClassName="p-6"
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      // In the iOS extension, KeyboardAvoidingView measures the keyboard
+      // against the screen while the sheet only covers part of it, so its
+      // padding fills the sheet. The scroll view's own inset handling converts
+      // the keyboard frame into the sheet's coordinates.
+      automaticallyAdjustKeyboardInsets={plain}
+    >
+      {children}
+    </ScrollView>
+  );
+  if (plain) return <View className="flex-1 bg-canvas">{scroll}</View>;
   return (
     <KeyboardAvoidingView className="flex-1 bg-canvas" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerClassName="p-6" keyboardShouldPersistTaps="handled">
-        {children}
-      </ScrollView>
+      {scroll}
     </KeyboardAvoidingView>
   );
 }

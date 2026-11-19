@@ -18,7 +18,7 @@
     "expo-notifications": "~58.1.9",
     "expo-router": "~58.0.32",
     "expo-secure-store": "~58.0.3",
-    "expo-share-extension": "^5.0.6",
+    "expo-share-extension": "5.0.6",
     "expo-share-intent": "^9.0.0",
     "expo-status-bar": "~58.0.5",
     "expo-updates": "~58.0.22",
@@ -49,5 +49,8 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },
-  "private": true
+  "private": true,
+  "patchedDependencies": {
+    "expo-share-extension@5.0.6": "patches/expo-share-extension@5.0.6.patch"
+  }
 }
