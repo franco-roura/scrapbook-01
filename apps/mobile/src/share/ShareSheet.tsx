@@ -52,7 +52,7 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
 
   if (!signedIn) {
     return (
-      <Frame>
+      <Frame plain={plain}>
         <HudLabel code="S-01" plain={plain}>
           Guardar en Scrapbook/01
         </HudLabel>
@@ -79,7 +79,7 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
   const busy = state.kind === 'saving' || state.kind === 'saved';
 
   return (
-    <Frame>
+    <Frame plain={plain}>
       <HudLabel code="S-01" plain={plain}>
         Guardar en Scrapbook/01
       </HudLabel>
@@ -147,12 +147,25 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
   );
 }
 
-function Frame({ children }: { children: React.ReactNode }) {
+function Frame({ children, plain }: { children: React.ReactNode; plain?: boolean }) {
+  const scroll = (
+    <ScrollView
+      contentContainerClassName="p-6"
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      // In the iOS extension, KeyboardAvoidingView measures the keyboard
+      // against the screen while the sheet only covers part of it, so its
+      // padding fills the sheet. The scroll view's own inset handling converts
+      // the keyboard frame into the sheet's coordinates.
+      automaticallyAdjustKeyboardInsets={plain}
+    >
+      {children}
+    </ScrollView>
+  );
+  if (plain) return <View className="flex-1 bg-canvas">{scroll}</View>;
   return (
     <KeyboardAvoidingView className="flex-1 bg-canvas" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerClassName="p-6" keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        {children}
-      </ScrollView>
+      {scroll}
     </KeyboardAvoidingView>
   );
 }
