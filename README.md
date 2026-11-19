@@ -11,12 +11,18 @@
 </p>
 
 <p align="center">
+  <a href="https://d2gh6vwoycfx90.cloudfront.net"><b>Join the waitlist</b></a> for the hosted app,
+  or <a href="docs/self-hosting.md"><b>host your own copy</b></a> on AWS. Whichever you like.
+</p>
+
+<p align="center">
   <a href="https://github.com/franco-roura/scrapbook-01/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/franco-roura/scrapbook-01/ci.yml?branch=main&style=flat-square&label=CI"></a>
   <a href="https://github.com/franco-roura/scrapbook-01/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/franco-roura/scrapbook-01?style=flat-square&color=53575e"></a>
   <img alt="Go" src="https://img.shields.io/badge/API-Go-1c1e21?style=flat-square&logo=go">
   <img alt="Expo" src="https://img.shields.io/badge/app-Expo%20%2F%20React%20Native-1c1e21?style=flat-square&logo=expo">
   <img alt="MCP" src="https://img.shields.io/badge/AI-MCP%20server-1c1e21?style=flat-square">
-  <img alt="Self-hosted on AWS" src="https://img.shields.io/badge/self--hosted-AWS%20Lambda-ffd9c7?style=flat-square">
+  <a href="https://d2gh6vwoycfx90.cloudfront.net"><img alt="Waitlist open" src="https://img.shields.io/badge/waitlist-open-ffd9c7?style=flat-square"></a>
+  <a href="docs/self-hosting.md"><img alt="Self-host on AWS" src="https://img.shields.io/badge/or%20self--host-AWS%20Lambda-1c1e21?style=flat-square"></a>
   <img alt="License: MIT OR Apache-2.0" src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-53575e?style=flat-square">
 </p>
 
@@ -28,17 +34,37 @@ The app and the website are in Uruguayan Spanish; the code and these docs are in
 
 ## Contents
 
+- [Two ways to use it](#two-ways-to-use-it)
 - [Why Scrapbook/01](#why-scrapbook01)
 - [Share it, say what it's about](#share-it-say-what-its-about)
 - [It sorts itself, for a fraction of a cent](#it-sorts-itself-for-a-fraction-of-a-cent)
 - [A graph of everything you saved](#a-graph-of-everything-you-saved)
 - [Ask your own AI about it](#ask-your-own-ai-about-it)
-- [Up and running in five minutes](#up-and-running-in-five-minutes)
-- [Serverless, so it costs cents](#serverless-so-it-costs-cents)
+- [Host your own, for cents](#host-your-own-for-cents)
+- [Run it locally in five minutes](#run-it-locally-in-five-minutes)
 - [Status](#status)
 - [Who's behind it](#whos-behind-it)
 - [Contributing](#contributing)
 - [Security and license](#security-and-license)
+
+## Two ways to use it
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <b>Use the hosted app</b><br>
+      We run Scrapbook/01 for you. Sign-up opens in waves: leave your email on the
+      <a href="https://d2gh6vwoycfx90.cloudfront.net">landing page</a> and you'll get an invitation.
+      Sorting and AI are paid from prepaid credits, and new accounts start with some free.
+    </td>
+    <td width="50%" valign="top">
+      <b>Host your own</b><br>
+      The same app in your own AWS account, with your own WorkOS and AI keys. It scales to zero,
+      so one person's month is about two cents of hosting.
+      <a href="docs/self-hosting.md">Self-hosting guide →</a>
+    </td>
+  </tr>
+</table>
 
 ## Why Scrapbook/01
 
@@ -119,18 +145,11 @@ save new links. Your assistant's reasoning is billed to your own plan, not to Sc
 
 **[Read more: AI assistants →](docs/ai-assistants.md)**
 
-## Up and running in five minutes
+## Host your own, for cents
 
-You need Go, Bun and Docker, plus a free [WorkOS](https://workos.com) sandbox for sign-in. Postgres
-runs in Docker, and a fake AI server stands in for Jev, the embeddings API and Claude, so the whole
-save, sort and link flow works without any AI keys.
-
-**[Read more: getting started →](docs/getting-started.md)**
-
-## Serverless, so it costs cents
-
-On AWS the API and the sorting worker are Go Lambdas behind API Gateway, the web app and landing page
-are static sites on CloudFront, and Postgres runs on Neon, which scales to zero. With nobody using it,
+Prefer your own copy? Everything here deploys to your AWS account with one command. The API and the
+sorting worker are Go Lambdas behind API Gateway, the web app and landing page are static sites on
+CloudFront, and Postgres runs on Neon, which scales to zero. With nobody using it,
 nothing is billed. One person's month comes to about two cents of hosting; the AI calls are paid from
 prepaid credits.
 
@@ -141,13 +160,21 @@ prepaid credits.
 **[Read more: architecture and costs →](docs/architecture.md)** ·
 **[Host it yourself →](docs/self-hosting.md)**
 
+## Run it locally in five minutes
+
+You need Go, Bun and Docker, plus a free [WorkOS](https://workos.com) sandbox for sign-in. Postgres
+runs in Docker, and a fake AI server stands in for Jev, the embeddings API and Claude, so the whole
+save, sort and link flow works without any AI keys.
+
+**[Read more: getting started →](docs/getting-started.md)**
+
 ## Status
 
 Early, and built in the open: the current release is
 [v0.1.0](https://github.com/franco-roura/scrapbook-01/releases). The Go API, the MCP server, sorting, credits and the web app are tested
-and run locally. Not yet proven on real hardware or accounts: the iOS share extension and push
-notifications on a device, a first AWS deploy, and payments for credit packs (packs can be granted by
-hand for now). Issues and pull requests are welcome.
+and run locally, and the hosted app runs on AWS behind the waitlist. Not yet proven on real hardware:
+the iOS share extension and push notifications on a device. Payments for credit packs aren't connected
+yet (packs can be granted by hand for now). Issues and pull requests are welcome.
 
 ## Who's behind it
 
