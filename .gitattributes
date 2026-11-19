@@ -1,0 +1,13 @@
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+
+# Generated code: collapsed in diffs and left out of language stats.
+server/internal/db/*.sql.go linguist-generated=true
+server/internal/db/models.go linguist-generated=true
+server/internal/db/querier.go linguist-generated=true
+server/internal/db/db.go linguist-generated=true
+**/bun.lock linguist-generated=true
+CHANGELOG.md linguist-generated=true
