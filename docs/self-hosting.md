@@ -2,6 +2,9 @@
 
 # Host it yourself on AWS
 
+Rather not run anything? [Join the waitlist](https://d2gh6vwoycfx90.cloudfront.net) for the hosted app
+instead. This guide is for running your own copy in your AWS account.
+
 The whole stack is defined in [`sst.config.ts`](../sst.config.ts) with [SST](https://sst.dev) and
 deploys to your own AWS account with one command. At personal scale it costs about two cents a month
 (see [what it costs](architecture.md#what-it-costs)).
