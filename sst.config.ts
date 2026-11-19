@@ -14,7 +14,8 @@ export default $config({
       home: "aws",
       removal: input?.stage === "prod" ? "retain" : "remove",
       protect: input?.stage === "prod",
-      providers: { aws: { region: "us-east-1" } },
+      // São Paulo, next to the Neon database and closest to Uruguay.
+      providers: { aws: { region: "sa-east-1" } },
     };
   },
   async run() {
@@ -43,21 +44,49 @@ export default $config({
       EXPO_ACCESS_TOKEN: secret.expoAccessToken.value,
     };
     const goFunction = {
-      runtime: "go" as const,
+      runtime: "provided.al2023" as const,
       architecture: "arm64" as const,
       memory: "512 MB" as const,
       logging: { retention: "1 week" as const },
+      handler: "bootstrap",
+    };
+
+    // Each Lambda is compiled here into .build/<name>/bootstrap and handed to
+    // SST as a prebuilt bundle. SST's own "go" runtime builds the package
+    // path without its "./" on Windows, so Go looks for it in the standard
+    // library ("package cmd/lambda-worker is not in std").
+    const { execFileSync } = await import("node:child_process");
+    const buildGo = (name: string) => {
+      execFileSync(
+        "go",
+        ["build", "-tags", "lambda.norpc", "-trimpath", "-ldflags", "-s -w",
+         "-o", `../.build/${name}/bootstrap`, `./cmd/${name}`],
+        {
+          cwd: `${$cli.paths.root}/server`,
+          stdio: "inherit",
+          env: { ...process.env, GOOS: "linux", GOARCH: "arm64", CGO_ENABLED: "0" },
+        },
+      );
+      return `.build/${name}`;
     };
 
     const worker = new sst.aws.Function("Worker", {
       ...goFunction,
-      handler: "./server/cmd/lambda-worker",
+      bundle: buildGo("lambda-worker"),
       timeout: "5 minutes",
       environment: shared,
     });
 
     const api = new sst.aws.ApiGatewayV2("Api", {
-      cors: false, // the Go API answers CORS itself (CORS_ORIGINS)
+      // The Go API answers CORS itself (CORS_ORIGINS). SST's `cors: false`
+      // still sets an empty CORS configuration, and with any configuration
+      // API Gateway answers preflights itself and strips the API's CORS
+      // headers, so drop it entirely.
+      transform: {
+        api: (args) => {
+          args.corsConfiguration = undefined;
+        },
+      },
       accessLog: { retention: "1 week" },
     });
     // Created between the API and its route: the web build needs the API's
@@ -75,7 +104,7 @@ export default $config({
 
     api.route("$default", {
       ...goFunction,
-      handler: "./server/cmd/lambda-api",
+      bundle: buildGo("lambda-api"),
       timeout: "29 seconds",
       environment: {
         ...shared,

@@ -24,7 +24,7 @@ deploys to your own AWS account with one command. At personal scale it costs abo
 
 ## One-time setup
 
-1. **Neon.** Create a project in **AWS us-east-1**, the region the Lambdas run in. From its Connect
+1. **Neon.** Create a project in **AWS sa-east-1** (São Paulo), the region the Lambdas run in. From its Connect
    panel, copy two connection strings:
    - the **pooled** one (the host contains `-pooler`): the Lambdas use it;
    - the **direct** one: migrations use it, since they need a session the pooler doesn't keep.

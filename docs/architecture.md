@@ -18,8 +18,9 @@ app. There's no VPC, so no NAT gateway. [`sst.config.ts`](../sst.config.ts) defi
 
 ## What it costs
 
-Estimated for **`us-east-1`** with **November 2026 prices**, for one active person: about 20,000 API
-requests and 1,000 saves a month, a 50 MB database, and the hourly sweep.
+Estimated with **`us-east-1`** list prices from **November 2026**, for one active person: about 20,000 API
+requests and 1,000 saves a month, a 50 MB database, and the hourly sweep. The stack deploys to
+`sa-east-1` (São Paulo), where per-request prices are somewhat higher; at this scale the total is still cents.
 
 | Service | What it does | Free tier | Monthly cost |
 | --- | --- | --- | --- |

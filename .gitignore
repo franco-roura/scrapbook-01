@@ -1,4 +1,6 @@
 # SST
 .sst/
 sst-env.d.ts
+# Lambda binaries sst.config.ts compiles
+.build/
 node_modules/
