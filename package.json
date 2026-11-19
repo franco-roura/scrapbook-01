@@ -1,8 +1,11 @@
 {
   "name": "scrapbook01",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "changeset": "changeset",
+    "release:version": "changeset version && bun scripts/release/sync-version.ts && bun install",
     "migrate": "cd server && go run ./cmd/migrate",
     "deploy": "bun run migrate && sst deploy --stage prod",
     "diff": "sst diff --stage prod",
@@ -12,9 +15,11 @@
     "docs:screenshots": "bun scripts/docs/screenshots.ts",
     "docs:diagram": "bun scripts/docs/architecture.ts",
     "app:icons": "bun scripts/docs/app-icons.ts",
-    "docs:render":"bun scripts/docs/render-svg.ts docs/brand/icon.svg docs/brand/icon.png 512 && bun scripts/docs/render-svg.ts docs/brand/architecture.svg docs/brand/architecture.png 1600 && bun scripts/docs/render-svg.ts docs/brand/hero.svg docs/brand/hero.png 1600 && bun scripts/docs/render-svg.ts docs/brand/social.svg docs/brand/social.png 1280 && bun scripts/docs/render-svg.ts docs/brand/hero-es.svg docs/brand/hero-es.png 1600 && cp docs/brand/hero-es.png apps/website/public/app.png"
+    "docs:render": "bun scripts/docs/render-svg.ts docs/brand/icon.svg docs/brand/icon.png 512 && bun scripts/docs/render-svg.ts docs/brand/architecture.svg docs/brand/architecture.png 1600 && bun scripts/docs/render-svg.ts docs/brand/hero.svg docs/brand/hero.png 1600 && bun scripts/docs/render-svg.ts docs/brand/social.svg docs/brand/social.png 1280 && bun scripts/docs/render-svg.ts docs/brand/hero-es.svg docs/brand/hero-es.png 1600 && cp docs/brand/hero-es.png apps/website/public/app.png"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "1.0.1",
+    "@changesets/cli": "3.0.3",
     "@playwright/test": "1.64.1",
     "sst": "4.17.2"
   }
