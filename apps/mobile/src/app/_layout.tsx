@@ -5,20 +5,20 @@ import { Michroma_400Regular } from '@expo-google-fonts/michroma';
 import { SpaceMono_400Regular, SpaceMono_700Bold } from '@expo-google-fonts/space-mono';
 import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';
-import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import { useEffect } from 'react';
+import { Stack, useNavigationContainerRef, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, View } from 'react-native';
 
 import { AndroidShareListener } from '../share/AndroidShareListener';
 import { AuthProvider } from '../lib/auth';
 import { PushRegistrar } from '../lib/push';
-import { initSentry } from '../lib/sentry';
+import { initSentry, registerNavigation } from '../lib/sentry';
 import { HeaderActions } from '../ui/HeaderActions';
 import { Button, colors, Panel, Text } from '../ui/module01';
 
 // Before the first render, so the first screen gets a navigation span. A
-// no-op without EXPO_PUBLIC_SENTRY_DSN. expoRouterIntegration (in initSentry)
-// picks up Expo Router's navigation container itself.
+// no-op without EXPO_PUBLIC_SENTRY_DSN.
 initSentry({ surface: Platform.OS === 'web' ? 'web' : 'app' });
 
 function RootLayout() {
@@ -30,6 +30,10 @@ function RootLayout() {
     SpaceMono_400Regular,
     SpaceMono_700Bold,
   });
+  const navigationRef = useNavigationContainerRef();
+  useEffect(() => {
+    if (fontsLoaded) registerNavigation(navigationRef);
+  }, [fontsLoaded, navigationRef]);
   if (!fontsLoaded) return null;
 
   return (

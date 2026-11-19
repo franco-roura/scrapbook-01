@@ -51,6 +51,9 @@ busier, lower the sample rates:
 - `EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` (apps, default `1`)
 - `VITE_SENTRY_TRACES_SAMPLE_RATE` (landing page, default `1`)
 
+To check a setup, set `SENTRY_DEBUG=true` (server) or `EXPO_PUBLIC_SENTRY_DEBUG=true` (apps) and
+the SDK logs everything it sends.
+
 Errors are always sent in full. Some things are left out on purpose to save quota: CORS preflights and
 404 responses aren't traced, and neither are River's own queue queries when you run the server locally.
 

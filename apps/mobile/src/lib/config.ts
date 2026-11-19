@@ -14,6 +14,8 @@ export const config = {
   // nothing is sent (the default for self-hosters).
   sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? '',
   sentryTracesSampleRate: sampleRate(process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE),
+  // "true" logs what the Sentry SDK does, to check a setup.
+  sentryDebug: process.env.EXPO_PUBLIC_SENTRY_DEBUG === 'true',
 };
 
 function sampleRate(raw: string | undefined): number {

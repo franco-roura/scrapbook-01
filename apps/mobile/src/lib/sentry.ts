@@ -13,13 +13,23 @@ import { config } from './config';
 export type Surface = 'app' | 'share-extension' | 'web';
 
 let enabled = false;
+let navigation: ReturnType<typeof Sentry.reactNavigationIntegration> | null = null;
 
 /** Starts Sentry once per process. Returns whether it is on. */
 export function initSentry({ surface }: { surface: Surface }): boolean {
   if (!config.sentryDsn) return false;
   if (enabled) return true;
+  // One transaction per screen. expoRouterIntegration reuses this one and adds
+  // templated route names, but it only waits 5 s for the navigation
+  // container; the root layout renders nothing until fonts load, so
+  // registerNavigation (from the layout) makes sure it's attached.
+  navigation =
+    surface === 'share-extension'
+      ? null
+      : Sentry.reactNavigationIntegration({ enableTimeToInitialDisplay: surface === 'app' });
   Sentry.init({
     dsn: config.sentryDsn,
+    debug: config.sentryDebug,
     environment: typeof __DEV__ !== 'undefined' && __DEV__ ? 'development' : 'production',
     sendDefaultPii: false,
     tracesSampleRate: config.sentryTracesSampleRate,
@@ -33,9 +43,7 @@ export function initSentry({ surface }: { surface: Surface }): boolean {
     tracePropagationTargets: [new RegExp(`^${escapeRegExp(config.apiUrl)}(/|$)`)],
     integrations:
       // The share extension has no router: one screen, manual spans.
-      surface === 'share-extension'
-        ? []
-        : [Sentry.expoRouterIntegration({ enableTimeToInitialDisplay: surface === 'app' })],
+      navigation ? [navigation, Sentry.expoRouterIntegration()] : [],
     enableNativeFramesTracking: surface === 'app',
     initialScope: { tags: { surface } },
     beforeSend: (event) => scrubEvent(event),
@@ -44,6 +52,11 @@ export function initSentry({ surface }: { surface: Surface }): boolean {
   });
   enabled = true;
   return true;
+}
+
+/** Attaches screen tracking to Expo Router's navigation container. */
+export function registerNavigation(ref: unknown): void {
+  navigation?.registerNavigationContainer(ref);
 }
 
 // --- user -------------------------------------------------------------------

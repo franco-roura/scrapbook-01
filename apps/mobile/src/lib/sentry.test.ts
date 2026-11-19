@@ -4,12 +4,13 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test';
 
 const init = mock(() => undefined);
 const setUser = mock(() => undefined);
-const fakeConfig = { apiUrl: 'https://api.test', sentryDsn: '', sentryTracesSampleRate: 1 };
+const fakeConfig = { apiUrl: 'https://api.test', sentryDsn: '', sentryTracesSampleRate: 1, sentryDebug: false };
 
 mock.module('@sentry/react-native', () => ({
   init,
   setUser,
   expoRouterIntegration: () => ({ name: 'ExpoRouter' }),
+  reactNavigationIntegration: () => ({ name: 'ReactNavigation', registerNavigationContainer: () => {} }),
 }));
 mock.module('expo-crypto', () => ({ CryptoDigestAlgorithm: { SHA1: 'SHA-1' }, digest: async () => new ArrayBuffer(20) }));
 mock.module('./config', () => ({ config: fakeConfig }));
