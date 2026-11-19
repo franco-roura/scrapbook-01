@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+### Minor Changes
+
+- [#10](https://github.com/franco-roura/scrapbook-01/pull/10) [`a588f40`](https://github.com/franco-roura/scrapbook-01/commit/a588f409c4ea240d5771886cbc8ae013e08e4e20) Thanks [@franco-roura](https://github.com/franco-roura)! - Add a Conectar IA screen with a button per assistant: Claude opens its connector dialog already filled in, ChatGPT and other AIs expand the steps and copy the server link.
+
+### Patch Changes
+
+- [#11](https://github.com/franco-roura/scrapbook-01/pull/11) [`3246a02`](https://github.com/franco-roura/scrapbook-01/commit/3246a020e644ce9abc6492626dd77029b984f337) Thanks [@franco-roura](https://github.com/franco-roura)! - Fix the iOS share sheet opening empty: the share extension now starts React Native through Expo's factory so Expo modules load, draws its content inside the visible sheet, no longer opens the keyboard on its own, and shows a spinner while loading and an error message instead of a blank panel.
+
 ## 0.1.1
 
 ### Patch Changes
