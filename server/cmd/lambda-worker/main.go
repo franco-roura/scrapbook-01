@@ -13,9 +13,9 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/google/uuid"
 
-	"github.com/aaugoustis/waitlist/server/internal/app"
-	"github.com/aaugoustis/waitlist/server/internal/config"
-	"github.com/aaugoustis/waitlist/server/internal/jobs"
+	"github.com/franco-roura/scrapbook-01/server/internal/app"
+	"github.com/franco-roura/scrapbook-01/server/internal/config"
+	"github.com/franco-roura/scrapbook-01/server/internal/jobs"
 )
 
 func main() {

@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/aaugoustis/waitlist/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
 )
 
 const defaultEndpoint = "https://exp.host/--/api/v2/push/send"

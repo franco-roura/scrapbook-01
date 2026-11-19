@@ -17,7 +17,7 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/charset"
 
-	"github.com/aaugoustis/waitlist/server/internal/links"
+	"github.com/franco-roura/scrapbook-01/server/internal/links"
 )
 
 // Preview is what a link says about itself. Empty fields weren't found.
@@ -38,7 +38,7 @@ const (
 	maxTitle     = 300
 	maxDesc      = 1000
 	maxSite      = 100
-	userAgent    = "Scrapbook01-Preview/1.0 (+https://github.com/aaugoustis/waitlist)"
+	userAgent    = "Scrapbook01-Preview/1.0 (+https://github.com/franco-roura/scrapbook-01)"
 	acceptHTML   = "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5"
 )
 

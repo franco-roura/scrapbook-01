@@ -23,12 +23,12 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 
-	"github.com/aaugoustis/waitlist/server/db/migrations"
-	"github.com/aaugoustis/waitlist/server/internal/ai"
-	"github.com/aaugoustis/waitlist/server/internal/classify"
-	"github.com/aaugoustis/waitlist/server/internal/credits"
-	"github.com/aaugoustis/waitlist/server/internal/db"
-	"github.com/aaugoustis/waitlist/server/internal/jobs"
+	"github.com/franco-roura/scrapbook-01/server/db/migrations"
+	"github.com/franco-roura/scrapbook-01/server/internal/ai"
+	"github.com/franco-roura/scrapbook-01/server/internal/classify"
+	"github.com/franco-roura/scrapbook-01/server/internal/credits"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/jobs"
 )
 
 func setup(t *testing.T) (*db.Queries, *pgxpool.Pool) {

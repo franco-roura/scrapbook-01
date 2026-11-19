@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/aaugoustis/waitlist/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
 )
 
 // Querier is the part of db.Querier the Runner uses.

@@ -19,10 +19,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/aaugoustis/waitlist/server/internal/auth"
-	"github.com/aaugoustis/waitlist/server/internal/config"
-	"github.com/aaugoustis/waitlist/server/internal/credits"
-	"github.com/aaugoustis/waitlist/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/auth"
+	"github.com/franco-roura/scrapbook-01/server/internal/config"
+	"github.com/franco-roura/scrapbook-01/server/internal/credits"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
 )
 
 func main() {

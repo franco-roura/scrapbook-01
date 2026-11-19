@@ -12,7 +12,7 @@ import (
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"github.com/google/uuid"
 
-	"github.com/aaugoustis/waitlist/server/internal/config"
+	"github.com/franco-roura/scrapbook-01/server/internal/config"
 )
 
 type nopEnqueuer struct{}

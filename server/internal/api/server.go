@@ -11,9 +11,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/aaugoustis/waitlist/server/internal/auth"
-	"github.com/aaugoustis/waitlist/server/internal/credits"
-	"github.com/aaugoustis/waitlist/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/auth"
+	"github.com/franco-roura/scrapbook-01/server/internal/credits"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
 )
 
 // maxBody caps request bodies; a save is a URL plus a short description.

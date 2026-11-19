@@ -27,12 +27,12 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 
-	"github.com/aaugoustis/waitlist/server/internal/ai"
-	"github.com/aaugoustis/waitlist/server/internal/auth"
-	"github.com/aaugoustis/waitlist/server/internal/credits"
-	"github.com/aaugoustis/waitlist/server/internal/db"
-	"github.com/aaugoustis/waitlist/server/internal/graph"
-	"github.com/aaugoustis/waitlist/server/internal/links"
+	"github.com/franco-roura/scrapbook-01/server/internal/ai"
+	"github.com/franco-roura/scrapbook-01/server/internal/auth"
+	"github.com/franco-roura/scrapbook-01/server/internal/credits"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/graph"
+	"github.com/franco-roura/scrapbook-01/server/internal/links"
 )
 
 // Path is where the MCP endpoint is mounted.

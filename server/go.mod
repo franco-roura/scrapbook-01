@@ -1,4 +1,4 @@
-module github.com/aaugoustis/waitlist/server
+module github.com/franco-roura/scrapbook-01/server
 
 go 1.27.0
 

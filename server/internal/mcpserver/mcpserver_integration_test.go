@@ -28,11 +28,11 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pressly/goose/v3"
 
-	"github.com/aaugoustis/waitlist/server/db/migrations"
-	"github.com/aaugoustis/waitlist/server/internal/ai"
-	"github.com/aaugoustis/waitlist/server/internal/auth"
-	"github.com/aaugoustis/waitlist/server/internal/db"
-	"github.com/aaugoustis/waitlist/server/internal/mcpserver"
+	"github.com/franco-roura/scrapbook-01/server/db/migrations"
+	"github.com/franco-roura/scrapbook-01/server/internal/ai"
+	"github.com/franco-roura/scrapbook-01/server/internal/auth"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/mcpserver"
 )
 
 const issuer = "https://test.authkit.app"

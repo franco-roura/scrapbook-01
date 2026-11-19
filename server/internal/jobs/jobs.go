@@ -16,9 +16,9 @@ import (
 	"github.com/riverqueue/river/rivermigrate"
 	"github.com/riverqueue/river/rivertype"
 
-	"github.com/aaugoustis/waitlist/server/internal/classify"
-	"github.com/aaugoustis/waitlist/server/internal/db"
-	"github.com/aaugoustis/waitlist/server/internal/preview"
+	"github.com/franco-roura/scrapbook-01/server/internal/classify"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/preview"
 )
 
 // ClassifyArgs asks for one item to be (re)classified.

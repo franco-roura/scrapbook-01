@@ -3,9 +3,9 @@ package api
 import (
 	"net/http"
 
-	"github.com/aaugoustis/waitlist/server/internal/auth"
-	"github.com/aaugoustis/waitlist/server/internal/db"
-	"github.com/aaugoustis/waitlist/server/internal/graph"
+	"github.com/franco-roura/scrapbook-01/server/internal/auth"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/graph"
 )
 
 const (

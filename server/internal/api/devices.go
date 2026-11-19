@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/aaugoustis/waitlist/server/internal/auth"
-	"github.com/aaugoustis/waitlist/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/auth"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
 )
 
 type registerDeviceRequest struct {

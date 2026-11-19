@@ -19,8 +19,8 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 
-	"github.com/aaugoustis/waitlist/server/db/migrations"
-	"github.com/aaugoustis/waitlist/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/db/migrations"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
 )
 
 func setup(t *testing.T) (*db.Queries, *pgxpool.Pool) {

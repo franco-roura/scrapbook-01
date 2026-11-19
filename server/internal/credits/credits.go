@@ -13,8 +13,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/aaugoustis/waitlist/server/internal/ai"
-	"github.com/aaugoustis/waitlist/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/ai"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
 )
 
 // ModelShare is the part of a pack's price that becomes model budget.

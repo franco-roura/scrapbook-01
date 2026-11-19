@@ -10,8 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/aaugoustis/waitlist/server/internal/app"
-	"github.com/aaugoustis/waitlist/server/internal/config"
+	"github.com/franco-roura/scrapbook-01/server/internal/app"
+	"github.com/franco-roura/scrapbook-01/server/internal/config"
 )
 
 func main() {

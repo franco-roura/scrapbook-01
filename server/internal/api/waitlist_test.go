@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aaugoustis/waitlist/server/internal/auth"
-	"github.com/aaugoustis/waitlist/server/internal/waitlist"
+	"github.com/franco-roura/scrapbook-01/server/internal/auth"
+	"github.com/franco-roura/scrapbook-01/server/internal/waitlist"
 )
 
 type fakeWaitlist struct {

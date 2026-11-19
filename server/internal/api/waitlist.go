@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/aaugoustis/waitlist/server/internal/waitlist"
+	"github.com/franco-roura/scrapbook-01/server/internal/waitlist"
 )
 
 // Waitlist adds someone to the sign-up waitlist. waitlist.WorkOS implements it.

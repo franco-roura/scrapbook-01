@@ -20,8 +20,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/aaugoustis/waitlist/server/internal/db"
-	"github.com/aaugoustis/waitlist/server/internal/links"
+	"github.com/franco-roura/scrapbook-01/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/links"
 )
 
 func mustURL(t *testing.T, s string) *url.URL {
