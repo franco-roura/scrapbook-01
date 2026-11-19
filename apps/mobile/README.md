@@ -29,6 +29,45 @@ The share sheet needs a development build, not Expo Go: `bun x eas-cli build --p
 
 In the WorkOS dashboard (Redirects), add the redirect URIs: `scrapbook01://auth/callback` for the phone builds and `http://localhost:8081/auth/callback` (sandbox) or your web origin's `/auth/callback` for the web build.
 
+## Install on phones (EAS)
+
+Builds run on Expo's servers (`eas.json`), so this works from Windows, iOS included. Builds point at the deployed API; the WorkOS client id comes from an EAS environment variable.
+
+One-time setup, from `apps/mobile`:
+
+```bash
+bun x eas-cli login
+bun x eas-cli init                 # creates the EAS project, writes its id to app.json
+bun x eas-cli update:configure     # adds the update URL to app.json
+bun x eas-cli env:create --name EXPO_PUBLIC_WORKOS_CLIENT_ID --value client_… --environment production --visibility plaintext
+```
+
+- **Android:** `bun x eas-cli build -p android --profile preview` builds an APK and prints a link. Open it on the phone, allow installing from the browser, done. It stays installed.
+- **iPhone:** needs a paid Apple Developer account. `bun x eas-cli build -p ios --profile production --auto-submit` registers the bundle ids and app group with Apple, builds, and uploads to TestFlight. Add testers in App Store Connect (TestFlight → Internal Testing) and install from the TestFlight app. A build lasts 90 days.
+
+### iPhone without a paid account (Mac + Xcode)
+
+A free Apple ID signs builds for 7 days, then the app stops opening until you install it again. Fine for a developer's own phone; send everyone else the Android APK or TestFlight.
+
+1. On the Mac, `bun install` in `apps/mobile`, then create `.env.local` with the deployed values (local builds read it, not `eas.json`):
+   ```
+   EXPO_PUBLIC_API_URL=https://l1t92cu8hj.execute-api.sa-east-1.amazonaws.com
+   EXPO_PUBLIC_WORKOS_CLIENT_ID=client_…   # production WorkOS client id
+   ```
+2. Xcode → Settings → Accounts: sign in with your Apple ID (this makes a free "Personal Team").
+3. `bun x expo prebuild -p ios`, then `xed ios`. In Signing & Capabilities, pick the Personal Team for both targets, the app and the share extension.
+4. Plug in the iPhone and turn on Settings → Privacy & Security → Developer Mode.
+5. `bun x expo run:ios --device --configuration Release`. Release bundles the JavaScript, so the app runs without the Mac.
+6. On the phone, trust the profile: Settings → General → VPN & Device Management.
+
+Every 7 days, plug in and repeat step 5. Free teams have limits: push notifications aren't available (remove the capability if Xcode objects), and if App Groups are refused, the share sheet can't see the app's sign-in. If `com.scrapbook01.app` is taken, change `ios.bundleIdentifier` in `app.json` to something of your own.
+
+**Updates:** JavaScript-only changes reach both phones without a rebuild: `bun x eas-cli update --channel production -m "what changed"`. Phones pick it up on the next launch after it downloads. Native changes (a new module, the share extension, `app.json` plugins) change the runtime fingerprint and need a new build; updates never reach a build with a different fingerprint.
+
+## Icons
+
+`assets/icon.png` (iOS), the three `android-icon-*.png` layers, `splash-icon.png` and `favicon.png` are rendered from the brand icon, `docs/brand/icon.svg`. After changing it, run `bun run app:icons` from the repository root. Phones only show a new icon after a new build.
+
 ## Checks
 
 ```bash
