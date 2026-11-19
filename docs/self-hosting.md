@@ -83,8 +83,10 @@ Tell WorkOS about the new addresses:
 
 For the phone builds, set `EXPO_PUBLIC_API_URL=<api>` when building, and add
 `scrapbook01://auth/callback` to the redirects.
-With Sentry, also add `EXPO_PUBLIC_SENTRY_DSN` (the mobile project's DSN) to the EAS environment, and
-`SENTRY_AUTH_TOKEN` as an EAS secret if you want readable native crash reports.
+`apps/mobile/eas.json` uploads source maps and dSYMs to Sentry: change its `SENTRY_ORG` and
+`SENTRY_PROJECT` to yours and add `SENTRY_AUTH_TOKEN` as an EAS secret, along with
+`EXPO_PUBLIC_SENTRY_DSN` (the mobile project's DSN) in the EAS environment. Without Sentry, set
+`SENTRY_DISABLE_AUTO_UPLOAD` to `"true"` there instead, or the builds fail.
 
 ## Check it works
 
