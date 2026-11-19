@@ -1,6 +1,9 @@
 diff --git a/node_modules/expo-share-extension/.bun-tag-8d22010c475a1dfd b/.bun-tag-8d22010c475a1dfd
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/expo-share-extension/.bun-tag-8f0cb440aed54d63 b/.bun-tag-8f0cb440aed54d63
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/node_modules/expo-share-extension/.bun-tag-94fdcd1b2fb16765 b/.bun-tag-94fdcd1b2fb16765
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
@@ -20,21 +23,23 @@ index 3816339ae033c7b49c7d683d4c432888d5080788..10c9c6588504572c85cc46355decdbc6
          PRODUCT_BUNDLE_IDENTIFIER: `"${bundleIdentifier}"`,
          PRODUCT_NAME: `"${targetName}"`,
 diff --git a/plugin/swift/ShareExtensionViewController.swift b/plugin/swift/ShareExtensionViewController.swift
-index 7f9f6d84323d9fdcc80b23a661f76af8dd8bf793..e6d71e1e754bd8f9ca588aa6fade8da251cf9774 100644
+index 7f9f6d84323d9fdcc80b23a661f76af8dd8bf793..fbaed269b8b0119b8c84e71c8160663755b57a50 100644
 --- a/plugin/swift/ShareExtensionViewController.swift
 +++ b/plugin/swift/ShareExtensionViewController.swift
-@@ -2,6 +2,10 @@ import UIKit
+@@ -2,6 +2,12 @@ import UIKit
  import React
  import React_RCTAppDelegate
  import ReactAppDependencyProvider
 +// Expo SDK 58 installs `globalThis.expo` (EventEmitter, NativeModule, ...) only
 +// from ExpoReactNativeFactory. A plain RCTReactNativeFactory leaves it undefined
 +// and every Expo module's JS throws at load.
-+import Expo
++// `internal` to match the generated ExpoModulesProvider.swift in this target;
++// Swift rejects mixed access levels for the same import.
++internal import Expo
  import AVFoundation
  import UniformTypeIdentifiers
  // if react native firebase is installed, we import and configure it
-@@ -12,7 +16,7 @@ import FirebaseCore
+@@ -12,7 +18,7 @@ import FirebaseCore
  import FirebaseAuth
  #endif
  
@@ -43,7 +48,7 @@ index 7f9f6d84323d9fdcc80b23a661f76af8dd8bf793..e6d71e1e754bd8f9ca588aa6fade8da2
    override func sourceURL(for bridge: RCTBridge) -> URL? {
      self.bundleURL()
    }
-@@ -98,7 +102,7 @@ class ShareExtensionViewController: UIViewController {
+@@ -98,7 +104,7 @@ class ShareExtensionViewController: UIViewController {
        
        reactNativeFactoryDelegate = ReactNativeDelegate()
        reactNativeFactoryDelegate!.dependencyProvider = RCTAppDependencyProvider()
@@ -52,7 +57,7 @@ index 7f9f6d84323d9fdcc80b23a661f76af8dd8bf793..e6d71e1e754bd8f9ca588aa6fade8da2
        
        var initialProps = sharedData ?? [:]
        
-@@ -140,24 +144,12 @@ class ShareExtensionViewController: UIViewController {
+@@ -140,24 +146,12 @@ class ShareExtensionViewController: UIViewController {
    private func configureRootView(_ rootView: UIView, withBackgroundColorDict dict: [String: CGFloat]?, withHeight: CGFloat?) {
      rootView.backgroundColor = backgroundColor(from: dict)
  
