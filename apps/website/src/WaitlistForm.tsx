@@ -2,7 +2,8 @@ import { Button, Field, fault, Input } from "@franco_roura/module-01";
 import { useId, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
-import { submit, validate, type Signup } from "./waitlist";
+import { captureError, withSpan } from "./sentry";
+import { submit, SubmitError, validate, type Signup } from "./waitlist";
 
 /**
  * Name, email and "Quiero mi lugar", in one row on wide screens. `onSignal` is for the CtaBanner,
@@ -32,7 +33,8 @@ export function WaitlistForm({ onSignal = false }: { onSignal?: boolean }) {
     }
     setSending(true);
     try {
-      const outcome = await submit(values);
+      // The span carries no attributes: the name and email never leave the form.
+      const outcome = await withSpan("waitlist.submit", "ui.action.submit", () => submit(values));
       setValues({ name: "", email: "" });
       if (outcome === "already_user") {
         toast.success("Ya tenés cuenta. Entrá desde la app con tu email");
@@ -42,6 +44,8 @@ export function WaitlistForm({ onSignal = false }: { onSignal?: boolean }) {
         );
       }
     } catch (err) {
+      // Validation failures and "already_user" never get here; everything else is unexpected.
+      captureError(err instanceof SubmitError ? err.report : err);
       toast.error(
         err instanceof Error ? err.message : "No pudimos anotarte. Probá de nuevo en un minuto",
       );
