@@ -1,0 +1,33 @@
+diff --git a/plugin/swift/ShareExtensionViewController.swift b/plugin/swift/ShareExtensionViewController.swift
+index 7f9f6d84323d9fdcc80b23a661f76af8dd8bf793..7ce1c50ad249981aeb990ccab3df831c3a32ac94 100644
+--- a/plugin/swift/ShareExtensionViewController.swift
++++ b/plugin/swift/ShareExtensionViewController.swift
+@@ -2,6 +2,10 @@ import UIKit
+ import React
+ import React_RCTAppDelegate
+ import ReactAppDependencyProvider
++// Expo SDK 58 installs `globalThis.expo` (EventEmitter, NativeModule, ...) only
++// from ExpoReactNativeFactory. A plain RCTReactNativeFactory leaves it undefined
++// and every Expo module's JS throws at load.
++import Expo
+ import AVFoundation
+ import UniformTypeIdentifiers
+ // if react native firebase is installed, we import and configure it
+@@ -12,7 +16,7 @@ import FirebaseCore
+ import FirebaseAuth
+ #endif
+ 
+-class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
++class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
+   override func sourceURL(for bridge: RCTBridge) -> URL? {
+     self.bundleURL()
+   }
+@@ -98,7 +102,7 @@ class ShareExtensionViewController: UIViewController {
+       
+       reactNativeFactoryDelegate = ReactNativeDelegate()
+       reactNativeFactoryDelegate!.dependencyProvider = RCTAppDependencyProvider()
+-      reactNativeFactory = RCTReactNativeFactory(delegate: reactNativeFactoryDelegate!)
++      reactNativeFactory = ExpoReactNativeFactory(delegate: reactNativeFactoryDelegate!)
+       
+       var initialProps = sharedData ?? [:]
+       
