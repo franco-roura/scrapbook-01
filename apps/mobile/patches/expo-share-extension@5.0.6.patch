@@ -1,6 +1,24 @@
 diff --git a/node_modules/expo-share-extension/.bun-tag-8d22010c475a1dfd b/.bun-tag-8d22010c475a1dfd
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/expo-share-extension/.bun-tag-94fdcd1b2fb16765 b/.bun-tag-94fdcd1b2fb16765
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/plugin/build/xcode/addToXCConfigurationList.js b/plugin/build/xcode/addToXCConfigurationList.js
+index 3816339ae033c7b49c7d683d4c432888d5080788..10c9c6588504572c85cc46355decdbc62a3b90dd 100644
+--- a/plugin/build/xcode/addToXCConfigurationList.js
++++ b/plugin/build/xcode/addToXCConfigurationList.js
+@@ -6,7 +6,9 @@ function addXCConfigurationList(xcodeProject, { targetName, currentProjectVersio
+         CLANG_ENABLE_MODULES: "YES",
+         CURRENT_PROJECT_VERSION: `"${currentProjectVersion}"`,
+         INFOPLIST_FILE: `${targetName}/Info.plist`,
+-        IPHONEOS_DEPLOYMENT_TARGET: `"15.1"`,
++        // Match the app (Expo SDK 58: iOS 16.4). The extension imports Expo,
++        // whose module refuses to compile for an older deployment target.
++        IPHONEOS_DEPLOYMENT_TARGET: `"16.4"`,
+         LD_RUNPATH_SEARCH_PATHS: `"$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"`,
+         PRODUCT_BUNDLE_IDENTIFIER: `"${bundleIdentifier}"`,
+         PRODUCT_NAME: `"${targetName}"`,
 diff --git a/plugin/swift/ShareExtensionViewController.swift b/plugin/swift/ShareExtensionViewController.swift
 index 7f9f6d84323d9fdcc80b23a661f76af8dd8bf793..e6d71e1e754bd8f9ca588aa6fade8da251cf9774 100644
 --- a/plugin/swift/ShareExtensionViewController.swift
