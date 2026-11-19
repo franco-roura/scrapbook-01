@@ -26,9 +26,9 @@ import (
 	"github.com/franco-roura/scrapbook-01/server/internal/db"
 	"github.com/franco-roura/scrapbook-01/server/internal/jobs"
 	"github.com/franco-roura/scrapbook-01/server/internal/mcpserver"
-	"github.com/franco-roura/scrapbook-01/server/internal/waitlist"
 	"github.com/franco-roura/scrapbook-01/server/internal/preview"
 	"github.com/franco-roura/scrapbook-01/server/internal/push"
+	"github.com/franco-roura/scrapbook-01/server/internal/waitlist"
 )
 
 // Enqueuer queues an item for classification or a preview fetch.

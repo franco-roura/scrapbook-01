@@ -20,11 +20,11 @@ import (
 const maxBody = 16 << 10
 
 type Server struct {
-	q       db.Querier
-	log     *slog.Logger
-	ping    func(context.Context) error
-	authMW  func(http.Handler) http.Handler
-	cors    map[string]bool
+	q        db.Querier
+	log      *slog.Logger
+	ping     func(context.Context) error
+	authMW   func(http.Handler) http.Handler
+	cors     map[string]bool
 	enqueue  Enqueuer
 	credits  *credits.Ledger
 	waitlist Waitlist
