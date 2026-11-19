@@ -24,8 +24,9 @@ updates:
       root:
         update-types: [minor, patch]
 
-  # The Expo SDK pins React Native and its modules; majors move with
+  # The Expo SDK pins React, React Native and its modules; majors move with
   # `bun x expo install --fix` when the SDK is upgraded, not one by one.
+  # React and React Native are pinned exactly, so even their patches wait.
   - package-ecosystem: bun
     directory: /apps/mobile
     schedule:
@@ -36,6 +37,9 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-native"
 
   - package-ecosystem: bun
     directory: /apps/website
