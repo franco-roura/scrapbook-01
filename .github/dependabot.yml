@@ -1,0 +1,46 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /server
+    schedule:
+      interval: weekly
+    groups:
+      go:
+        update-types: [minor, patch]
+
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      root:
+        update-types: [minor, patch]
+
+  # The Expo SDK pins React Native and its modules; majors move with
+  # `bun x expo install --fix` when the SDK is upgraded, not one by one.
+  - package-ecosystem: bun
+    directory: /apps/mobile
+    schedule:
+      interval: weekly
+    groups:
+      mobile:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: bun
+    directory: /apps/website
+    schedule:
+      interval: weekly
+    groups:
+      website:
+        update-types: [minor, patch]
