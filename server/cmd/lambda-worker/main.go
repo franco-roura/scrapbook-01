@@ -26,6 +26,9 @@ func main() {
 		log.Error("config", "err", err)
 		os.Exit(1)
 	}
+	if _, err := app.InitTelemetry(cfg, "worker", true); err != nil {
+		log.Error("sentry: not reporting", "err", err)
+	}
 	pool, err := app.LambdaPool(ctx, cfg.DatabaseURL)
 	if err != nil {
 		log.Error("database", "err", err)

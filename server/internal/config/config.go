@@ -87,6 +87,12 @@ type Config struct {
 	// ExpoAccessToken is optional (needed only with Expo push security on).
 	ExpoAccessToken string
 
+	// Sentry is optional: an empty SentryDSN turns error and performance
+	// reporting off.
+	SentryDSN              string
+	SentryEnvironment      string
+	SentryTracesSampleRate float64
+
 	ShutdownTimeout time.Duration
 }
 
@@ -123,6 +129,8 @@ func Load() (Config, error) {
 		ExpoAccessToken:    os.Getenv("EXPO_ACCESS_TOKEN"),
 		PreviewBucket:      os.Getenv("PREVIEW_BUCKET"),
 		PreviewBaseURL:     strings.TrimRight(os.Getenv("PREVIEW_BASE_URL"), "/"),
+		SentryDSN:          os.Getenv("SENTRY_DSN"),
+		SentryEnvironment:  env("SENTRY_ENVIRONMENT", "development"),
 	}
 	var errs []error
 	floatEnv := func(key, fallback string, dst *float64) {
@@ -141,6 +149,11 @@ func Load() (Config, error) {
 	floatEnv("EMBEDDINGS_PRICE_PER_MTOK", "0.02", &c.EmbeddingsPrice)
 	floatEnv("NAMER_INPUT_PRICE_PER_MTOK", "0.10", &c.NamerInputPrice)
 	floatEnv("NAMER_OUTPUT_PRICE_PER_MTOK", "0.50", &c.NamerOutputPrice)
+	if r, err := strconv.ParseFloat(env("SENTRY_TRACES_SAMPLE_RATE", "1"), 64); err != nil || r < 0 || r > 1 {
+		errs = append(errs, errors.New("SENTRY_TRACES_SAMPLE_RATE must be a number from 0 to 1"))
+	} else {
+		c.SentryTracesSampleRate = r
+	}
 	if t, err := strconv.ParseFloat(env("JEV_THRESHOLD", "0.6"), 64); err != nil || t < 0 || t > 1 {
 		errs = append(errs, errors.New("JEV_THRESHOLD must be a number from 0 to 1"))
 	} else {

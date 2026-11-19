@@ -28,6 +28,7 @@ import (
 	"github.com/franco-roura/scrapbook-01/server/internal/mcpserver"
 	"github.com/franco-roura/scrapbook-01/server/internal/preview"
 	"github.com/franco-roura/scrapbook-01/server/internal/push"
+	"github.com/franco-roura/scrapbook-01/server/internal/telemetry"
 	"github.com/franco-roura/scrapbook-01/server/internal/waitlist"
 )
 
@@ -112,7 +113,7 @@ func (c *Core) Handler(ctx context.Context, enq Enqueuer) (http.Handler, error) 
 		c.Log.Warn("WORKOS_API_KEY unset: the waitlist endpoint is off")
 	}
 	root.Handle("/", api.New(apiOpts).Handler())
-	return root, nil
+	return telemetry.Middleware(telemetry.Routes(root)), nil
 }
 
 // SweepPreviews fetches up to limit recent previews that were never

@@ -8,6 +8,8 @@ import (
 	"net/netip"
 	"syscall"
 	"time"
+
+	"github.com/franco-roura/scrapbook-01/server/internal/telemetry"
 )
 
 // ErrBlockedAddress is returned when a link resolves to an address the server
@@ -70,7 +72,8 @@ func NewClient() *http.Client {
 		IdleConnTimeout:       30 * time.Second,
 	}
 	return &http.Client{
-		Transport: transport,
+		// Spans name only the host: the path is the user's saved link.
+		Transport: telemetry.HostOnlyTransport(transport),
 		Timeout:   10 * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {

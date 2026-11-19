@@ -4,6 +4,8 @@ import (
 	"context"
 	"math"
 	"sync"
+
+	"github.com/franco-roura/scrapbook-01/server/internal/telemetry"
 )
 
 // Usage is one model call's token counts and cost. Cost is in micro-dollars
@@ -42,6 +44,7 @@ func WithMeter(ctx context.Context) (context.Context, *Meter) {
 }
 
 func record(ctx context.Context, u Usage) {
+	telemetry.AnnotateAI(ctx, u.Service, u.Model, u.InputTokens, u.OutputTokens, u.Cost)
 	if m, ok := ctx.Value(meterKey{}).(*Meter); ok {
 		m.mu.Lock()
 		m.records = append(m.records, u)

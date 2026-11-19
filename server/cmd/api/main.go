@@ -13,8 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/franco-roura/scrapbook-01/server/internal/app"
 	"github.com/franco-roura/scrapbook-01/server/internal/config"
 	"github.com/franco-roura/scrapbook-01/server/internal/jobs"
@@ -33,10 +31,15 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	flush, err := app.InitTelemetry(cfg, "api", false)
+	if err != nil {
+		log.Error("sentry: not reporting", "err", err)
+	}
+	defer flush()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	pool, err := app.Pool(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("connect database: %w", err)
 	}

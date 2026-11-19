@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/franco-roura/scrapbook-01/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/telemetry"
 )
 
 const defaultEndpoint = "https://exp.host/--/api/v2/push/send"
@@ -94,7 +95,7 @@ func (e *Expo) send(ctx context.Context, msgs []message) ([]ticket, error) {
 	}
 	c := e.HTTP
 	if c == nil {
-		c = &http.Client{Timeout: 15 * time.Second}
+		c = &http.Client{Timeout: 15 * time.Second, Transport: telemetry.Transport(nil)}
 	}
 	res, err := c.Do(req)
 	if err != nil {

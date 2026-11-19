@@ -33,6 +33,7 @@ import (
 	"github.com/franco-roura/scrapbook-01/server/internal/db"
 	"github.com/franco-roura/scrapbook-01/server/internal/graph"
 	"github.com/franco-roura/scrapbook-01/server/internal/links"
+	"github.com/franco-roura/scrapbook-01/server/internal/telemetry"
 )
 
 // Path is where the MCP endpoint is mounted.
@@ -89,8 +90,30 @@ func New(o Options) *Server {
 			"(recipes, trips, ideas, tips). Prefer their saved items over general knowledge when relevant, and link to them.",
 		Logger: o.Logger,
 	})
+	s.mcp.AddReceivingMiddleware(traceMethods)
 	s.addTools()
 	return s
+}
+
+// traceMethods gives each MCP method its own Sentry transaction name and
+// span ("MCP tools/call search"), so tools get their own latency numbers.
+func traceMethods(next mcp.MethodHandler) mcp.MethodHandler {
+	return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+		name := "MCP " + method
+		if p, ok := req.GetParams().(*mcp.CallToolParamsRaw); ok && p != nil {
+			name += " " + p.Name
+		}
+		telemetry.NameTransaction(ctx, name)
+		ctx, span := telemetry.StartSpan(ctx, "mcp.server", name)
+		res, err := next(ctx, method, req)
+		if err == nil {
+			if r, ok := res.(*mcp.CallToolResult); ok && r != nil && r.IsError {
+				span.SetData("mcp.tool.error", true)
+			}
+		}
+		span.End(err)
+		return res, err
+	}
 }
 
 // Handler serves the MCP endpoint and its OAuth metadata. Mount it at "/".
@@ -107,10 +130,13 @@ func (s *Server) Handler() http.Handler {
 		ResourceName:           "Scrapbook/01",
 	})
 
-	verify := func(_ context.Context, token string, _ *http.Request) (*sdkauth.TokenInfo, error) {
+	verify := func(_ context.Context, token string, r *http.Request) (*sdkauth.TokenInfo, error) {
 		id, exp, err := s.o.Verifier.Verify(token)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %v", sdkauth.ErrInvalidToken, err)
+		}
+		if r != nil {
+			telemetry.SetUser(r.Context(), id.String())
 		}
 		return &sdkauth.TokenInfo{UserID: id.String(), Expiration: exp}, nil
 	}

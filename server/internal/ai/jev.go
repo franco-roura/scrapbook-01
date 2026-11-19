@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/franco-roura/scrapbook-01/server/internal/telemetry"
 )
 
 // Jev calls TypeSafe's Jev decision model (POST /v1/systemone).
@@ -56,7 +58,9 @@ type jevResponse struct {
 
 // Choose asks Jev which of the options (label → description, which may be
 // empty) fits state best.
-func (j *Jev) Choose(ctx context.Context, state, instructions string, options map[string]string) (Choice, error) {
+func (j *Jev) Choose(ctx context.Context, state, instructions string, options map[string]string) (_ Choice, err error) {
+	ctx, span := telemetry.StartSpan(ctx, "gen_ai.chat", "jev choose "+j.Model)
+	defer func() { span.End(err) }()
 	criteria := make(map[string]*string, len(options))
 	for label, desc := range options {
 		if desc == "" {
@@ -107,7 +111,7 @@ func (j *Jev) client() *http.Client {
 	return defaultHTTP
 }
 
-var defaultHTTP = &http.Client{Timeout: 30 * time.Second}
+var defaultHTTP = &http.Client{Timeout: 30 * time.Second, Transport: telemetry.Transport(nil)}
 
 // postJSON sends body with a bearer token and decodes a 2xx JSON response.
 func postJSON(ctx context.Context, c *http.Client, url, token string, body []byte, out any) error {
