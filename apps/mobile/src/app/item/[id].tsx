@@ -2,7 +2,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 
 import { ApiError, type Item } from '../../lib/api';
 import { api } from '../../lib/client';
@@ -95,6 +95,29 @@ export default function ItemScreen() {
         <HudLabel code="I-01">{platformLabel(item.url)}</HudLabel>
 
         <Panel serial={`GUARDADO · ${new Date(item.createdAt).toLocaleDateString('es-UY')}`} className="gap-4">
+          {item.previewImage ? (
+            <Image
+              source={{ uri: item.previewImage }}
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+              className="aspect-video w-full rounded-md bg-shell-recess"
+            />
+          ) : null}
+          {item.previewTitle || item.previewDescription ? (
+            <View className="gap-1">
+              {item.previewSite ? <Text variant="hudSm">{item.previewSite}</Text> : null}
+              {item.previewTitle ? (
+                <Text variant="label" numberOfLines={3}>
+                  {item.previewTitle}
+                </Text>
+              ) : null}
+              {item.previewDescription ? (
+                <Text variant="bodySm" numberOfLines={4}>
+                  {item.previewDescription}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
           <View className="flex-row gap-2">
             <Chip>{platformLabel(item.url)}</Chip>
             {item.category ? <Chip tone="signal">{item.category.name}</Chip> : null}

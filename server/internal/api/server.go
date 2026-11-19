@@ -25,13 +25,16 @@ type Server struct {
 	ping    func(context.Context) error
 	authMW  func(http.Handler) http.Handler
 	cors    map[string]bool
-	enqueue Enqueuer
-	credits *credits.Ledger
+	enqueue  Enqueuer
+	credits  *credits.Ledger
+	waitlist Waitlist
 }
 
 // Enqueuer queues background work. The jobs package implements it.
 type Enqueuer interface {
 	EnqueueClassify(ctx context.Context, itemID uuid.UUID) error
+	// EnqueuePreview fetches a new link's preview (title, image).
+	EnqueuePreview(ctx context.Context, itemID uuid.UUID) error
 }
 
 type Options struct {
@@ -43,14 +46,17 @@ type Options struct {
 	// CORSOrigins are browser origins allowed to call the API (the web
 	// build of the app). Native apps don't need CORS.
 	CORSOrigins []string
-	// Enqueuer queues classification after saves. Optional.
+	// Enqueuer queues classification and previews after saves. Optional.
 	Enqueuer Enqueuer
 	// Credits serves GET /v1/credits. Optional.
 	Credits *credits.Ledger
+	// Waitlist serves POST /v1/waitlist. Optional: without it the endpoint
+	// answers 503.
+	Waitlist Waitlist
 }
 
 func New(o Options) *Server {
-	s := &Server{q: o.Queries, log: o.Logger, ping: o.Ping, cors: map[string]bool{}, enqueue: o.Enqueuer, credits: o.Credits}
+	s := &Server{q: o.Queries, log: o.Logger, ping: o.Ping, cors: map[string]bool{}, enqueue: o.Enqueuer, credits: o.Credits, waitlist: o.Waitlist}
 	for _, origin := range o.CORSOrigins {
 		s.cors[origin] = true
 	}
@@ -72,6 +78,9 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) routes(authMW func(http.Handler) http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.healthz)
+	// The landing page's form: public, so it's outside authMW. The more
+	// specific pattern wins over "/v1/" below.
+	mux.HandleFunc("POST /v1/waitlist", s.joinWaitlist)
 
 	v1 := http.NewServeMux()
 	v1.HandleFunc("POST /v1/items", s.createItem)

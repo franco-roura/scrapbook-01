@@ -30,7 +30,7 @@ func (q *Queries) DeleteItem(ctx context.Context, arg DeleteItemParams) (int64, 
 }
 
 const getItem = `-- name: GetItem :one
-SELECT i.id, i.url, i.platform, i.description, i.preview_title, i.preview_image,
+SELECT i.id, i.url, i.platform, i.description, i.preview_title, i.preview_description, i.preview_site, i.preview_image,
        i.created_at, i.updated_at, i.category_id, c.name AS category_name, i.category_source,
        (i.description IS NOT NULL AND i.classified_at IS DISTINCT FROM i.described_at)::bool AS classifying
 FROM items i
@@ -44,18 +44,20 @@ type GetItemParams struct {
 }
 
 type GetItemRow struct {
-	ID             uuid.UUID
-	Url            string
-	Platform       string
-	Description    *string
-	PreviewTitle   *string
-	PreviewImage   *string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	CategoryID     *uuid.UUID
-	CategoryName   *string
-	CategorySource string
-	Classifying    bool
+	ID                 uuid.UUID
+	Url                string
+	Platform           string
+	Description        *string
+	PreviewTitle       *string
+	PreviewDescription *string
+	PreviewSite        *string
+	PreviewImage       *string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	CategoryID         *uuid.UUID
+	CategoryName       *string
+	CategorySource     string
+	Classifying        bool
 }
 
 func (q *Queries) GetItem(ctx context.Context, arg GetItemParams) (GetItemRow, error) {
@@ -67,6 +69,8 @@ func (q *Queries) GetItem(ctx context.Context, arg GetItemParams) (GetItemRow, e
 		&i.Platform,
 		&i.Description,
 		&i.PreviewTitle,
+		&i.PreviewDescription,
+		&i.PreviewSite,
 		&i.PreviewImage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -78,8 +82,60 @@ func (q *Queries) GetItem(ctx context.Context, arg GetItemParams) (GetItemRow, e
 	return i, err
 }
 
+const getItemForPreview = `-- name: GetItemForPreview :one
+SELECT id, url, platform, preview_fetched_at FROM items WHERE id = $1
+`
+
+type GetItemForPreviewRow struct {
+	ID               uuid.UUID
+	Url              string
+	Platform         string
+	PreviewFetchedAt *time.Time
+}
+
+func (q *Queries) GetItemForPreview(ctx context.Context, id uuid.UUID) (GetItemForPreviewRow, error) {
+	row := q.db.QueryRow(ctx, getItemForPreview, id)
+	var i GetItemForPreviewRow
+	err := row.Scan(
+		&i.ID,
+		&i.Url,
+		&i.Platform,
+		&i.PreviewFetchedAt,
+	)
+	return i, err
+}
+
+const itemsNeedingPreview = `-- name: ItemsNeedingPreview :many
+SELECT id FROM items
+WHERE preview_fetched_at IS NULL AND created_at > now() - interval '7 days'
+ORDER BY created_at DESC
+LIMIT $1
+`
+
+// Recent items whose preview was never attempted (a failed invoke, or saved
+// before previews existed). Older ones are left alone.
+func (q *Queries) ItemsNeedingPreview(ctx context.Context, lim int32) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, itemsNeedingPreview, lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listItems = `-- name: ListItems :many
-SELECT i.id, i.url, i.platform, i.description, i.preview_title, i.preview_image,
+SELECT i.id, i.url, i.platform, i.description, i.preview_title, i.preview_description, i.preview_site, i.preview_image,
        i.created_at, i.updated_at, i.category_id, c.name AS category_name, i.category_source,
        (i.description IS NOT NULL AND i.classified_at IS DISTINCT FROM i.described_at)::bool AS classifying
 FROM items i
@@ -103,18 +159,20 @@ type ListItemsParams struct {
 }
 
 type ListItemsRow struct {
-	ID             uuid.UUID
-	Url            string
-	Platform       string
-	Description    *string
-	PreviewTitle   *string
-	PreviewImage   *string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	CategoryID     *uuid.UUID
-	CategoryName   *string
-	CategorySource string
-	Classifying    bool
+	ID                 uuid.UUID
+	Url                string
+	Platform           string
+	Description        *string
+	PreviewTitle       *string
+	PreviewDescription *string
+	PreviewSite        *string
+	PreviewImage       *string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	CategoryID         *uuid.UUID
+	CategoryName       *string
+	CategorySource     string
+	Classifying        bool
 }
 
 // Newest first, paged with a (created_at, id) cursor.
@@ -140,6 +198,8 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListIte
 			&i.Platform,
 			&i.Description,
 			&i.PreviewTitle,
+			&i.PreviewDescription,
+			&i.PreviewSite,
 			&i.PreviewImage,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -214,6 +274,36 @@ func (q *Queries) SetItemDescription(ctx context.Context, arg SetItemDescription
 	var needs_classifying bool
 	err := row.Scan(&needs_classifying)
 	return needs_classifying, err
+}
+
+const setItemPreview = `-- name: SetItemPreview :exec
+UPDATE items
+SET preview_title       = NULLIF($1::text, ''),
+    preview_description = NULLIF($2::text, ''),
+    preview_site        = NULLIF($3::text, ''),
+    preview_image       = NULLIF($4::text, ''),
+    preview_fetched_at  = now()
+WHERE id = $5
+`
+
+type SetItemPreviewParams struct {
+	Title       string
+	Description string
+	Site        string
+	Image       string
+	ID          uuid.UUID
+}
+
+// Records an attempt, found or not. Empty strings are stored as NULL.
+func (q *Queries) SetItemPreview(ctx context.Context, arg SetItemPreviewParams) error {
+	_, err := q.db.Exec(ctx, setItemPreview,
+		arg.Title,
+		arg.Description,
+		arg.Site,
+		arg.Image,
+		arg.ID,
+	)
+	return err
 }
 
 const upsertItem = `-- name: UpsertItem :one

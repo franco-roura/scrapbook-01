@@ -17,7 +17,13 @@ export type Item = {
   classifying: boolean;
   /** Waiting only because the credits ran out; sorted after a top-up. */
   waitingForCredits: boolean;
+  /** The link's own preview (Open Graph / oEmbed), for display only. All
+   * null until fetched, and for links that publish none (or hide behind a
+   * login wall, like Instagram). */
   previewTitle: string | null;
+  previewDescription: string | null;
+  previewSite: string | null;
+  /** Our own copy of the preview image (platform image links expire). */
   previewImage: string | null;
   createdAt: string;
   updatedAt: string;

@@ -137,10 +137,25 @@ func (f *fakeQueries) DeleteDevice(_ context.Context, a db.DeleteDeviceParams) e
 	return nil
 }
 
-// fakeEnqueuer records which items were queued for classification.
+// fakeEnqueuer records which items were queued for classification and for
+// previews.
 type fakeEnqueuer struct {
-	mu  sync.Mutex
-	ids []uuid.UUID
+	mu       sync.Mutex
+	ids      []uuid.UUID
+	previews []uuid.UUID
+}
+
+func (e *fakeEnqueuer) EnqueuePreview(_ context.Context, id uuid.UUID) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.previews = append(e.previews, id)
+	return nil
+}
+
+func (e *fakeEnqueuer) previewCount() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return len(e.previews)
 }
 
 func (e *fakeEnqueuer) EnqueueClassify(_ context.Context, id uuid.UUID) error {
@@ -432,6 +447,26 @@ func TestClassificationIsQueuedOnlyForNewDescriptions(t *testing.T) {
 		// The fake still reports classifying=true (no worker ran), so a second
 		// enqueue is expected here; River's unique jobs collapse it.
 		t.Fatalf("re-save: %d jobs", h.enq.count())
+	}
+}
+
+func TestPreviewIsQueuedOnlyForNewLinks(t *testing.T) {
+	h := newHarness(t)
+	user := uuid.New()
+
+	var it itemJSON
+	h.do(user, "POST", "/v1/items", `{"url":"https://example.com/post"}`, &it)
+	if h.enq.previewCount() != 1 || h.enq.previews[0] != it.ID {
+		t.Fatalf("new link: %d preview jobs", h.enq.previewCount())
+	}
+	if it.PreviewTitle != nil || it.PreviewDescription != nil || it.PreviewSite != nil || it.PreviewImage != nil {
+		t.Fatalf("preview fields before any fetch: %+v", it)
+	}
+	// Saving it again, even with a new description, doesn't fetch again.
+	h.do(user, "POST", "/v1/items", `{"url":"https://example.com/post","description":"a post"}`, nil)
+	h.do(user, "PATCH", "/v1/items/"+it.ID.String(), `{"description":"another"}`, nil)
+	if h.enq.previewCount() != 1 {
+		t.Fatalf("re-save: %d preview jobs", h.enq.previewCount())
 	}
 }
 

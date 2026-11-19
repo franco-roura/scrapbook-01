@@ -1,15 +1,15 @@
-// Waitlist sign-ups go to the "Lista de espera" Google Form (answers land in Google Sheets, with an
-// email notice). Google Forms accepts a plain form post but sends no CORS headers, so the request is
-// "no-cors": it's delivered, but the response can't be read. Only network failures are reported.
+// Waitlist sign-ups go to the API (POST /v1/waitlist), which adds them to the WorkOS AuthKit
+// waitlist. WorkOS emails a confirmation; approving the entry in the WorkOS dashboard (Users →
+// Waitlist) emails an invitation to create an account. The API URL is set at build time by SST.
 
-export const FORM_URL =
-  "https://docs.google.com/forms/d/e/1FAIpQLSdrA_gm_D_eVkIi9yQSZwIz776cye3_4ham1l0pwbaaqF2-Tg/formResponse";
-
-const FIELDS = { name: "entry.1777572684", email: "entry.1766984944" } as const;
+export const API_URL: string = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
 export type Signup = { name: string; email: string };
 
 export type SignupError = { field: keyof Signup; message: string };
+
+/** What happened to a sign-up the API answered. */
+export type Outcome = "joined" | "already_user";
 
 /** Checks a sign-up before it's sent. Returns the first problem, or null. */
 export function validate(s: Signup): SignupError | null {
@@ -20,15 +20,21 @@ export function validate(s: Signup): SignupError | null {
   return null;
 }
 
-/** The Google Form body for a sign-up. */
-export function encode(s: Signup): URLSearchParams {
-  const body = new URLSearchParams();
-  body.append(FIELDS.name, s.name.trim());
-  body.append(FIELDS.email, s.email.trim());
-  return body;
-}
-
-/** Sends a sign-up. Throws only when the request couldn't be made. */
-export async function submit(s: Signup, send: typeof fetch = fetch): Promise<void> {
-  await send(FORM_URL, { method: "POST", mode: "no-cors", body: encode(s) });
+/** Sends a sign-up. Throws when it couldn't be saved, with a message to show. */
+export async function submit(
+  s: Signup,
+  send: typeof fetch = fetch,
+  apiUrl: string = API_URL,
+): Promise<Outcome> {
+  const res = await send(`${apiUrl}/v1/waitlist`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: s.name.trim(), email: s.email.trim() }),
+  });
+  if (res.ok) return "joined";
+  const body = (await res.json().catch(() => null)) as {
+    error?: { code?: string; message?: string };
+  } | null;
+  if (res.status === 409 && body?.error?.code === "already_user") return "already_user";
+  throw new Error(body?.error?.message ?? "No pudimos anotarte. Probá de nuevo en un minuto.");
 }

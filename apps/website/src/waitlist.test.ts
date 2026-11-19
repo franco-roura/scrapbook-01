@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 
-import { encode, FORM_URL, submit, validate } from "./waitlist";
+import { submit, validate } from "./waitlist";
 
 describe("validate", () => {
   test("accepts a name and an email", () => {
@@ -16,17 +16,43 @@ describe("validate", () => {
   });
 });
 
-describe("submit", () => {
-  test("posts the trimmed fields to the Google Form", async () => {
-    const send = vi.fn(async () => new Response(null));
-    await submit({ name: " Ana ", email: " ana@example.com " }, send as unknown as typeof fetch);
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
-    expect(send).toHaveBeenCalledTimes(1);
+describe("submit", () => {
+  test("posts the trimmed fields to the API's waitlist", async () => {
+    const send = vi.fn(async () => json(200, { state: "pending" }));
+    const out = await submit(
+      { name: " Ana ", email: " ana@example.com " },
+      send as unknown as typeof fetch,
+      "https://api.example.test",
+    );
+
+    expect(out).toBe("joined");
     const [url, init] = send.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(FORM_URL);
-    expect(init.mode).toBe("no-cors");
-    const body = init.body as URLSearchParams;
-    expect(body.toString()).toBe(encode({ name: "Ana", email: "ana@example.com" }).toString());
-    expect(body.get("entry.1766984944")).toBe("ana@example.com");
+    expect(url).toBe("https://api.example.test/v1/waitlist");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ name: "Ana", email: "ana@example.com" });
+  });
+
+  test("tells existing users apart", async () => {
+    const send = vi.fn(async () =>
+      json(409, { error: { code: "already_user", message: "Ya tenés cuenta" } }),
+    );
+    const out = await submit(
+      { name: "Ana", email: "ana@example.com" },
+      send as unknown as typeof fetch,
+      "",
+    );
+    expect(out).toBe("already_user");
+  });
+
+  test("throws the API's message on failure", async () => {
+    const send = vi.fn(async () =>
+      json(502, { error: { code: "waitlist_failed", message: "No pudimos anotarte." } }),
+    );
+    await expect(
+      submit({ name: "Ana", email: "ana@example.com" }, send as unknown as typeof fetch, ""),
+    ).rejects.toThrow("No pudimos anotarte.");
   });
 });

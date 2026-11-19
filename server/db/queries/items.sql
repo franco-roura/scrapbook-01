@@ -17,7 +17,7 @@ RETURNING id, (xmax = 0)::bool AS inserted,
           (description IS NOT NULL AND classified_at IS DISTINCT FROM described_at)::bool AS needs_classifying;
 
 -- name: GetItem :one
-SELECT i.id, i.url, i.platform, i.description, i.preview_title, i.preview_image,
+SELECT i.id, i.url, i.platform, i.description, i.preview_title, i.preview_description, i.preview_site, i.preview_image,
        i.created_at, i.updated_at, i.category_id, c.name AS category_name, i.category_source,
        (i.description IS NOT NULL AND i.classified_at IS DISTINCT FROM i.described_at)::bool AS classifying
 FROM items i
@@ -26,7 +26,7 @@ WHERE i.id = @id AND i.user_id = @user_id;
 
 -- name: ListItems :many
 -- Newest first, paged with a (created_at, id) cursor.
-SELECT i.id, i.url, i.platform, i.description, i.preview_title, i.preview_image,
+SELECT i.id, i.url, i.platform, i.description, i.preview_title, i.preview_description, i.preview_site, i.preview_image,
        i.created_at, i.updated_at, i.category_id, c.name AS category_name, i.category_source,
        (i.description IS NOT NULL AND i.classified_at IS DISTINCT FROM i.described_at)::bool AS classifying
 FROM items i
@@ -66,3 +66,24 @@ RETURNING old.category_id AS from_category_id, old.description;
 
 -- name: DeleteItem :execrows
 DELETE FROM items WHERE id = @id AND user_id = @user_id;
+
+-- name: GetItemForPreview :one
+SELECT id, url, platform, preview_fetched_at FROM items WHERE id = @id;
+
+-- name: SetItemPreview :exec
+-- Records an attempt, found or not. Empty strings are stored as NULL.
+UPDATE items
+SET preview_title       = NULLIF(@title::text, ''),
+    preview_description = NULLIF(@description::text, ''),
+    preview_site        = NULLIF(@site::text, ''),
+    preview_image       = NULLIF(@image::text, ''),
+    preview_fetched_at  = now()
+WHERE id = @id;
+
+-- name: ItemsNeedingPreview :many
+-- Recent items whose preview was never attempted (a failed invoke, or saved
+-- before previews existed). Older ones are left alone.
+SELECT id FROM items
+WHERE preview_fetched_at IS NULL AND created_at > now() - interval '7 days'
+ORDER BY created_at DESC
+LIMIT @lim;

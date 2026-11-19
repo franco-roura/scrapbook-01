@@ -60,6 +60,7 @@ Every AI call is metered: the clients record tokens and cost (list price × toke
 - **New users** get `STARTER_CREDITS_USD` of budget the first time they're seen.
 - **Packs**: `credits.Ledger.RecordPurchase(user, price, pack, paymentRef)` adds 80% of the price as budget, the split promised on the waitlist page. The payment reference is unique, so a payment notification processed twice credits once. Until a payment provider is wired in, use the CLI: `go run ./cmd/credits purchase -user <uuid> -price 5 -pack starter -ref <payment id>` (or `grant`, `balance`).
 - **Out of credits**: saves are still kept, but classification waits; the sweep skips the user until a top-up, then sorts the waiting items within a minute. MCP search falls back to free keyword matching. A run can dip slightly below zero, since it's charged after it finishes.
+- `POST /v1/waitlist` (no sign-in) takes `{name, email}` from the landing page and adds it to the WorkOS AuthKit waitlist (`WORKOS_API_KEY`, `internal/waitlist`). It answers 409 `already_user` for an existing account and 503 when the key is unset.
 - `GET /v1/credits` returns the balance, an estimate of saves left (from the user's average cost), and recent activity.
 
 Typical costs at list prices: about $0.000014 to sort a save into an existing category (Jev + one embedding), about $0.0002 when Claude Haiku names a new category.

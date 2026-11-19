@@ -34,6 +34,27 @@ func TestWorkerRoutesEvents(t *testing.T) {
 		t.Fatalf("sweep event: err=%v classified=%v swept=%v", err, classified, swept)
 	}
 
+	var previewed uuid.UUID
+	w.Preview = func(_ context.Context, id uuid.UUID) error { previewed = id; return nil }
+	classified, swept = uuid.Nil, false
+	var pev WorkerEvent
+	if err := json.Unmarshal([]byte(`{"previewItemId":"`+id.String()+`"}`), &pev); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Handle(context.Background(), pev); err != nil || previewed != id || classified != uuid.Nil || swept {
+		t.Fatalf("preview event: err=%v previewed=%v classified=%v swept=%v", err, previewed, classified, swept)
+	}
+	// A marshalled preview event carries only previewItemId, and must
+	// route to the preview.
+	b, _ := json.Marshal(WorkerEvent{PreviewItemID: id})
+	previewed = uuid.Nil
+	if err := json.Unmarshal(b, &pev); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Handle(context.Background(), pev); err != nil || previewed != id || classified != uuid.Nil {
+		t.Fatalf("marshalled preview event %s: previewed=%v classified=%v", b, previewed, classified)
+	}
+
 	if err := w.Handle(context.Background(), WorkerEvent{}); err == nil {
 		t.Fatal("empty event: want an error")
 	}

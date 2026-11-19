@@ -62,18 +62,21 @@ type Edge struct {
 }
 
 type Item struct {
-	ID             uuid.UUID
-	UserID         uuid.UUID
-	Url            string
-	Platform       string
-	Description    *string
-	CategoryID     *uuid.UUID
-	PreviewTitle   *string
-	PreviewImage   *string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	Embedding      *pgvector.Vector
-	CategorySource string
-	DescribedAt    *time.Time
-	ClassifiedAt   *time.Time
+	ID                 uuid.UUID
+	UserID             uuid.UUID
+	Url                string
+	Platform           string
+	Description        *string
+	CategoryID         *uuid.UUID
+	PreviewTitle       *string
+	PreviewImage       *string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	Embedding          *pgvector.Vector
+	CategorySource     string
+	DescribedAt        *time.Time
+	ClassifiedAt       *time.Time
+	PreviewDescription *string
+	PreviewSite        *string
+	PreviewFetchedAt   *time.Time
 }

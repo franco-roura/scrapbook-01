@@ -2,7 +2,7 @@
 // a second tab.
 import { Link, Redirect, router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Item } from '../lib/api';
@@ -115,15 +115,32 @@ function Row({ item, index }: { item: Item; index: number }) {
             R-{String(index + 1).padStart(2, '0')} · {date}
           </Text>
         </View>
-        {item.description ? (
-          <Text variant="body" numberOfLines={3}>
-            {item.description}
-          </Text>
-        ) : (
-          <Text variant="bodySm" className="text-signal-ink">
-            Sin descripción · tocá para agregarla
-          </Text>
-        )}
+        <View className="flex-row gap-3">
+          {item.previewImage ? (
+            <Image
+              source={{ uri: item.previewImage }}
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+              className="h-16 w-16 rounded-md bg-shell-recess"
+            />
+          ) : null}
+          <View className="flex-1 gap-1">
+            {item.description ? (
+              <Text variant="body" numberOfLines={3}>
+                {item.description}
+              </Text>
+            ) : (
+              <Text variant="bodySm" className="text-signal-ink">
+                Sin descripción · tocá para agregarla
+              </Text>
+            )}
+            {item.previewTitle ? (
+              <Text variant="bodySm" numberOfLines={1}>
+                {item.previewTitle}
+              </Text>
+            ) : null}
+          </View>
+        </View>
         <View className="flex-row items-center gap-2">
           {item.category ? (
             <Chip tone="signal">{item.category.name}</Chip>

@@ -35,6 +35,7 @@ type Querier interface {
 	GetCreditBalance(ctx context.Context, userID uuid.UUID) (int64, error)
 	GetItem(ctx context.Context, arg GetItemParams) (GetItemRow, error)
 	GetItemForClassify(ctx context.Context, id uuid.UUID) (GetItemForClassifyRow, error)
+	GetItemForPreview(ctx context.Context, id uuid.UUID) (GetItemForPreviewRow, error)
 	// Creating a name that exists (ignoring case) returns the existing category.
 	InsertCategory(ctx context.Context, arg InsertCategoryParams) (InsertCategoryRow, error)
 	InsertCategoryFeedback(ctx context.Context, arg InsertCategoryFeedbackParams) error
@@ -44,6 +45,9 @@ type Querier interface {
 	// Skips users who are out of credits (a missing balance row means a new
 	// user who still gets starter credits).
 	ItemsNeedingClassification(ctx context.Context, lim int32) ([]uuid.UUID, error)
+	// Recent items whose preview was never attempted (a failed invoke, or saved
+	// before previews existed). Older ones are left alone.
+	ItemsNeedingPreview(ctx context.Context, lim int32) ([]uuid.UUID, error)
 	ListCategories(ctx context.Context, userID uuid.UUID) ([]ListCategoriesRow, error)
 	// Each category with up to three recent item descriptions, which tell Jev
 	// what the user actually files there.
@@ -65,6 +69,8 @@ type Querier interface {
 	SetItemCategoryByUser(ctx context.Context, arg SetItemCategoryByUserParams) (SetItemCategoryByUserRow, error)
 	SetItemDescription(ctx context.Context, arg SetItemDescriptionParams) (bool, error)
 	SetItemEmbedding(ctx context.Context, arg SetItemEmbeddingParams) error
+	// Records an attempt, found or not. Empty strings are stored as NULL.
+	SetItemPreview(ctx context.Context, arg SetItemPreviewParams) error
 	// A token moves to whoever signed in on that phone last.
 	UpsertDevice(ctx context.Context, arg UpsertDeviceParams) error
 	// Saving the same link again keeps one row. A new description replaces the

@@ -67,6 +67,9 @@ their terms and breaks often, and the link's preview text is usually generic ("W
 know what you saved and why, in your own words, and a short human description sorts better than any
 caption. It also keeps the AI input tiny, which is why sorting costs a fraction of a cent.
 
+The card does show the link's public preview (the title and picture a page publishes for link
+previews, read without signing in anywhere), but only for display. It never reaches the classifier.
+
 ## What never costs anything
 
 - Saving a link again without changing its description: nothing re-runs, since sorting only happens

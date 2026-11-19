@@ -1,5 +1,6 @@
-// Command lambda-worker classifies items on AWS Lambda. The API invokes it
-// asynchronously with {"itemId": "..."}; an hourly schedule invokes it with
+// Command lambda-worker classifies items and fetches link previews on AWS
+// Lambda. The API invokes it asynchronously with {"itemId": "..."} or
+// {"previewItemId": "..."}; an hourly schedule invokes it with
 // {"sweep": true} to catch missed items and users who topped up.
 package main
 
@@ -42,6 +43,14 @@ func main() {
 				"category", res.Category, "new_category", res.NewCategory, "changed", res.Changed)
 			return nil
 		},
+		Preview: func(ctx context.Context, id uuid.UUID) error {
+			p, err := core.Previews.Run(ctx, id)
+			if err != nil {
+				return err
+			}
+			log.InfoContext(ctx, "preview", "item", id, "found", !p.Empty(), "image", p.ImageURL != "")
+			return nil
+		},
 		Sweep: func(ctx context.Context) (int, error) {
 			// Stop early enough to finish the current item before the timeout.
 			if dl, ok := ctx.Deadline(); ok {
@@ -51,7 +60,12 @@ func main() {
 			}
 			n, err := core.Sweep(ctx, 50)
 			log.InfoContext(ctx, "sweep", "classified", n, "err", err)
-			return n, err
+			if err != nil {
+				return n, err
+			}
+			p, perr := core.SweepPreviews(ctx, 20)
+			log.InfoContext(ctx, "sweep", "previews", p, "err", perr)
+			return n, perr
 		},
 	}
 	lambda.Start(w.Handle)

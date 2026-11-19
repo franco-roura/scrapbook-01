@@ -18,6 +18,7 @@ import (
 type nopEnqueuer struct{}
 
 func (nopEnqueuer) EnqueueClassify(context.Context, uuid.UUID) error { return nil }
+func (nopEnqueuer) EnqueuePreview(context.Context, uuid.UUID) error  { return nil }
 
 // Feeds API Gateway v2 events through the same adapter the Lambda uses. No
 // database is reachable, so only routes that don't query it are checked.

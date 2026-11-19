@@ -36,5 +36,9 @@ an already compromised device or browser.
   whenever it's set.
 - Every query filters by the user from the token, never from the request. MCP clients get the same
   user's data and can only search, read and add saves.
+- To show link previews, the worker fetches each saved link once. It only connects to public
+  addresses: loopback, private, link-local (including the cloud metadata endpoint), CGNAT and
+  reserved ranges are refused after DNS resolution and on every redirect. Responses are size- and
+  time-limited, and preview images are re-encoded before they're stored.
 - Configuration and secrets come from environment variables (SST secrets on AWS), so the repository
   holds none.

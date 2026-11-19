@@ -21,9 +21,11 @@ import (
 // WorkerEvent is the worker Lambda's input.
 type WorkerEvent struct {
 	// ItemID asks for one item to be classified.
-	ItemID uuid.UUID `json:"itemId,omitempty"`
+	ItemID uuid.UUID `json:"itemId,omitzero"`
+	// PreviewItemID asks for one item's link preview to be fetched.
+	PreviewItemID uuid.UUID `json:"previewItemId,omitzero"`
 	// Sweep runs the catch-up pass instead.
-	Sweep bool `json:"sweep,omitempty"`
+	Sweep bool `json:"sweep,omitzero"`
 }
 
 // LambdaInvoker enqueues by invoking the worker Lambda asynchronously.
@@ -46,7 +48,16 @@ func NewLambdaInvoker(ctx context.Context, functionName string) (*LambdaInvoker,
 
 // EnqueueClassify implements api.Enqueuer.
 func (l *LambdaInvoker) EnqueueClassify(ctx context.Context, itemID uuid.UUID) error {
-	payload, err := json.Marshal(WorkerEvent{ItemID: itemID})
+	return l.invoke(ctx, WorkerEvent{ItemID: itemID})
+}
+
+// EnqueuePreview implements api.Enqueuer.
+func (l *LambdaInvoker) EnqueuePreview(ctx context.Context, itemID uuid.UUID) error {
+	return l.invoke(ctx, WorkerEvent{PreviewItemID: itemID})
+}
+
+func (l *LambdaInvoker) invoke(ctx context.Context, ev WorkerEvent) error {
+	payload, err := json.Marshal(ev)
 	if err != nil {
 		return err
 	}
@@ -62,6 +73,7 @@ func (l *LambdaInvoker) EnqueueClassify(ctx context.Context, itemID uuid.UUID) e
 // without a database.
 type Worker struct {
 	Classify func(ctx context.Context, itemID uuid.UUID) error
+	Preview  func(ctx context.Context, itemID uuid.UUID) error
 	Sweep    func(ctx context.Context) (int, error)
 }
 
@@ -71,9 +83,11 @@ func (w Worker) Handle(ctx context.Context, ev WorkerEvent) error {
 	case ev.Sweep:
 		_, err := w.Sweep(ctx)
 		return err
+	case ev.PreviewItemID != uuid.Nil:
+		return w.Preview(ctx, ev.PreviewItemID)
 	case ev.ItemID != uuid.Nil:
 		return w.Classify(ctx, ev.ItemID)
 	default:
-		return errors.New("jobs: worker event has neither itemId nor sweep")
+		return errors.New("jobs: worker event has no itemId, previewItemId or sweep")
 	}
 }

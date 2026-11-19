@@ -53,6 +53,7 @@ func run(log *slog.Logger) error {
 		Pool:       pool,
 		Queries:    core.Queries,
 		Classifier: core.Classifier,
+		Previews:   core.Previews,
 		Logger:     log,
 		RunWorkers: cfg.RunWorkers,
 	})

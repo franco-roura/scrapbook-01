@@ -42,18 +42,23 @@ type itemJSON struct {
 	Classifying bool `json:"classifying"`
 	// WaitingForCredits is true when the item is waiting only because the
 	// user is out of credits; it's sorted after a top-up.
-	WaitingForCredits bool      `json:"waitingForCredits"`
-	PreviewTitle      *string   `json:"previewTitle"`
-	PreviewImage      *string   `json:"previewImage"`
-	CreatedAt         time.Time `json:"createdAt"`
-	UpdatedAt         time.Time `json:"updatedAt"`
+	WaitingForCredits bool `json:"waitingForCredits"`
+	// The link's own preview (Open Graph or oEmbed), for display only. All
+	// null until fetched, and for links that publish none.
+	PreviewTitle       *string   `json:"previewTitle"`
+	PreviewDescription *string   `json:"previewDescription"`
+	PreviewSite        *string   `json:"previewSite"`
+	PreviewImage       *string   `json:"previewImage"`
+	CreatedAt          time.Time `json:"createdAt"`
+	UpdatedAt          time.Time `json:"updatedAt"`
 }
 
 // GetItemRow and ListItemsRow have the same columns.
 func toItemJSON(r db.GetItemRow) itemJSON {
 	it := itemJSON{
 		ID: r.ID, URL: r.Url, Platform: r.Platform, Description: r.Description,
-		PreviewTitle: r.PreviewTitle, PreviewImage: r.PreviewImage,
+		PreviewTitle: r.PreviewTitle, PreviewDescription: r.PreviewDescription,
+		PreviewSite: r.PreviewSite, PreviewImage: r.PreviewImage,
 		CreatedAt: r.CreatedAt.UTC(), UpdatedAt: r.UpdatedAt.UTC(),
 		CategorySource: r.CategorySource, Classifying: r.Classifying,
 	}
@@ -115,6 +120,9 @@ func (s *Server) createItem(w http.ResponseWriter, r *http.Request) {
 	}
 	if row.NeedsClassifying {
 		s.enqueueClassify(r, row.ID)
+	}
+	if row.Inserted {
+		s.enqueuePreview(r, row.ID)
 	}
 	item, err := s.q.GetItem(r.Context(), db.GetItemParams{ID: row.ID, UserID: user})
 	if err != nil {
@@ -431,6 +439,17 @@ func (s *Server) enqueueClassify(r *http.Request, id uuid.UUID) {
 	}
 	if err := s.enqueue.EnqueueClassify(r.Context(), id); err != nil {
 		s.log.ErrorContext(r.Context(), "enqueue classify", "item", id, "err", err)
+	}
+}
+
+// enqueuePreview queues a new link's preview fetch. Like classification, a
+// failure is only logged: the sweep picks the item up later.
+func (s *Server) enqueuePreview(r *http.Request, id uuid.UUID) {
+	if s.enqueue == nil {
+		return
+	}
+	if err := s.enqueue.EnqueuePreview(r.Context(), id); err != nil {
+		s.log.ErrorContext(r.Context(), "enqueue preview", "item", id, "err", err)
 	}
 }
 

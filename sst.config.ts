@@ -24,6 +24,8 @@ export default $config({
       databaseUrl: new sst.Secret("DatabaseUrl"),
       workosClientId: new sst.Secret("WorkosClientId"),
       workosAuthkitDomain: new sst.Secret("WorkosAuthkitDomain"),
+      // Secret key (sk_...): turns on the landing page's waitlist form.
+      workosApiKey: new sst.Secret("WorkosApiKey", ""),
       // Optional AI keys: an empty value turns that step off.
       typesafeApiKey: new sst.Secret("TypesafeApiKey", ""),
       embeddingsApiKey: new sst.Secret("EmbeddingsApiKey", ""),
@@ -38,6 +40,7 @@ export default $config({
       RUN_WORKERS: "false",
       WORKOS_CLIENT_ID: secret.workosClientId.value,
       WORKOS_AUTHKIT_DOMAIN: secret.workosAuthkitDomain.value,
+      WORKOS_API_KEY: secret.workosApiKey.value,
       TYPESAFE_API_KEY: secret.typesafeApiKey.value,
       EMBEDDINGS_API_KEY: secret.embeddingsApiKey.value,
       ANTHROPIC_API_KEY: secret.anthropicApiKey.value,
@@ -70,11 +73,24 @@ export default $config({
       return `.build/${name}`;
     };
 
+    // Our copies of link preview images (platform image links are signed and
+    // expire), served through CloudFront at <previewCdn>/previews/<item>.jpg.
+    const previews = new sst.aws.Bucket("Previews", { access: "cloudfront" });
+    const previewCdn = new sst.aws.Router("PreviewCdn");
+    previewCdn.routeBucket("/previews", previews);
+
     const worker = new sst.aws.Function("Worker", {
       ...goFunction,
       bundle: buildGo("lambda-worker"),
       timeout: "5 minutes",
-      environment: shared,
+      environment: {
+        ...shared,
+        PREVIEW_BUCKET: previews.name,
+        PREVIEW_BASE_URL: previewCdn.url,
+      },
+      permissions: [
+        { actions: ["s3:PutObject"], resources: [$interpolate`${previews.arn}/previews/*`] },
+      ],
     });
 
     const api = new sst.aws.ApiGatewayV2("Api", {
@@ -102,6 +118,14 @@ export default $config({
       },
     });
 
+    // The landing page (Vite+, React, Module/01). Its waitlist form posts to
+    // the API, which forwards to the WorkOS waitlist.
+    const landing = new sst.aws.StaticSite("Landing", {
+      path: "apps/website",
+      build: { command: "bun run build", output: "dist" },
+      environment: { VITE_API_URL: api.url },
+    });
+
     api.route("$default", {
       ...goFunction,
       bundle: buildGo("lambda-api"),
@@ -109,16 +133,10 @@ export default $config({
       environment: {
         ...shared,
         PUBLIC_URL: api.url,
-        CORS_ORIGINS: web.url,
+        CORS_ORIGINS: $interpolate`${web.url},${landing.url}`,
         WORKER_FUNCTION_NAME: worker.name,
       },
       permissions: [{ actions: ["lambda:InvokeFunction"], resources: [worker.arn] }],
-    });
-
-    // The landing page and waitlist (Vite+, React, Module/01).
-    const landing = new sst.aws.StaticSite("Landing", {
-      path: "apps/website",
-      build: { command: "bun run build", output: "dist" },
     });
 
     // Catches items whose classification was missed or waited for credits.
@@ -129,6 +147,6 @@ export default $config({
       event: { sweep: true },
     });
 
-    return { api: api.url, web: web.url, landing: landing.url };
+    return { api: api.url, web: web.url, landing: landing.url, previews: previewCdn.url };
   },
 });

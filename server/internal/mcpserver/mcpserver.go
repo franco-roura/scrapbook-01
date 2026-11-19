@@ -51,6 +51,8 @@ type Reranker interface {
 
 type Enqueuer interface {
 	EnqueueClassify(ctx context.Context, itemID uuid.UUID) error
+	// EnqueuePreview fetches a new link's preview (title, image).
+	EnqueuePreview(ctx context.Context, itemID uuid.UUID) error
 }
 
 type Options struct {
@@ -422,6 +424,11 @@ func (s *Server) save(ctx context.Context, req *mcp.CallToolRequest, in SaveInpu
 	if row.NeedsClassifying && s.o.Enqueuer != nil {
 		if err := s.o.Enqueuer.EnqueueClassify(ctx, row.ID); err != nil {
 			s.o.Logger.ErrorContext(ctx, "mcp save: enqueue classify", "err", err)
+		}
+	}
+	if row.Inserted && s.o.Enqueuer != nil {
+		if err := s.o.Enqueuer.EnqueuePreview(ctx, row.ID); err != nil {
+			s.o.Logger.ErrorContext(ctx, "mcp save: enqueue preview", "err", err)
 		}
 	}
 	return nil, SaveOutput{ID: row.ID.String(), URL: norm, Created: row.Inserted}, nil

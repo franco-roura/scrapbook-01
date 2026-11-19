@@ -22,8 +22,14 @@ Share from any app and the Scrapbook/01 sheet opens with the link filled in.
 
 The sheet asks one question: **"¿De qué se trata?"** (what is it about?). A few words are enough:
 "5 tradiciones para hacer con tu hija", "bar de ramen en Shinjuku". That line is what sorting, the graph and search work
-from. Scrapbook/01 never scrapes the post or guesses from its link, so it works the same for every
+from. Sorting never reads the post or guesses from its link, so it works the same for every
 app, including private and login-only ones.
+
+Once saved, the card also shows the link's **public preview** when it has one: the title, picture and
+site it publishes for link previews (Open Graph, or oEmbed for YouTube and TikTok). It's fetched once,
+in the background, and the picture is copied so it doesn't expire. It's display only: sorting never
+sees it. Links behind a login wall, like most Instagram posts, publish no preview to visitors who
+aren't signed in, so their card just shows your description.
 
 Describing is optional. Saves without a description go to the **Sin describir** (undescribed) inbox
 until you add one. Links are cleaned up when saved: tracking parameters go, `twitter.com` becomes `x.com` and

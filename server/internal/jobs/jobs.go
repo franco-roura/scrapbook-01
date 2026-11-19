@@ -18,6 +18,7 @@ import (
 
 	"github.com/aaugoustis/waitlist/server/internal/classify"
 	"github.com/aaugoustis/waitlist/server/internal/db"
+	"github.com/aaugoustis/waitlist/server/internal/preview"
 )
 
 // ClassifyArgs asks for one item to be (re)classified.
@@ -64,6 +65,31 @@ func (w *classifyWorker) Work(ctx context.Context, job *river.Job[ClassifyArgs])
 	return nil
 }
 
+// PreviewArgs asks for one item's link preview to be fetched.
+type PreviewArgs struct {
+	ItemID uuid.UUID `json:"item_id"`
+}
+
+func (PreviewArgs) Kind() string { return "fetch_preview" }
+
+// Previews are attempted once (the Runner records the attempt itself), so
+// River only retries database failures, a few times.
+func (PreviewArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: 3, UniqueOpts: river.UniqueOpts{ByArgs: true}}
+}
+
+type previewWorker struct {
+	river.WorkerDefaults[PreviewArgs]
+	r *preview.Runner
+}
+
+func (w *previewWorker) Timeout(*river.Job[PreviewArgs]) time.Duration { return 45 * time.Second }
+
+func (w *previewWorker) Work(ctx context.Context, job *river.Job[PreviewArgs]) error {
+	_, err := w.r.Run(ctx, job.Args.ItemID)
+	return err
+}
+
 // sweepArgs re-queues items whose classification was missed (an enqueue that
 // failed after a save, or jobs that ran out of attempts).
 type sweepArgs struct{}
@@ -78,12 +104,25 @@ type sweepWorker struct {
 
 func (w *sweepWorker) Work(ctx context.Context, _ *river.Job[sweepArgs]) error {
 	ids, err := w.q.ItemsNeedingClassification(ctx, 200)
-	if err != nil || len(ids) == 0 {
+	if err != nil {
 		return err
 	}
 	params := make([]river.InsertManyParams, len(ids))
 	for i, id := range ids {
 		params[i] = river.InsertManyParams{Args: ClassifyArgs{ItemID: id}}
+	}
+	if len(params) > 0 {
+		if _, err := w.client().InsertMany(ctx, params); err != nil {
+			return err
+		}
+	}
+	pids, err := w.q.ItemsNeedingPreview(ctx, 50)
+	if err != nil || len(pids) == 0 {
+		return err
+	}
+	params = make([]river.InsertManyParams, len(pids))
+	for i, id := range pids {
+		params[i] = river.InsertManyParams{Args: PreviewArgs{ItemID: id}}
 	}
 	_, err = w.client().InsertMany(ctx, params)
 	return err
@@ -100,6 +139,7 @@ type Options struct {
 	Pool       *pgxpool.Pool
 	Queries    db.Querier
 	Classifier *classify.Classifier
+	Previews   *preview.Runner
 	Logger     *slog.Logger
 	// RunWorkers processes jobs in this process. With it off, the Queue only
 	// enqueues (for an API-only deployment next to separate workers).
@@ -125,6 +165,7 @@ func New(o Options) (*Queue, error) {
 	if o.RunWorkers {
 		workers := river.NewWorkers()
 		river.AddWorker(workers, &classifyWorker{c: o.Classifier, log: o.Logger})
+		river.AddWorker(workers, &previewWorker{r: o.Previews})
 		river.AddWorker(workers, &sweepWorker{q: o.Queries, client: func() *river.Client[pgx.Tx] { return q.client }})
 		concurrency := o.Concurrency
 		if concurrency <= 0 {
@@ -167,5 +208,11 @@ func (q *Queue) Stop(ctx context.Context) error {
 // EnqueueClassify implements api.Enqueuer.
 func (q *Queue) EnqueueClassify(ctx context.Context, itemID uuid.UUID) error {
 	_, err := q.client.Insert(ctx, ClassifyArgs{ItemID: itemID}, nil)
+	return err
+}
+
+// EnqueuePreview implements api.Enqueuer.
+func (q *Queue) EnqueuePreview(ctx context.Context, itemID uuid.UUID) error {
+	_, err := q.client.Insert(ctx, PreviewArgs{ItemID: itemID}, nil)
 	return err
 }

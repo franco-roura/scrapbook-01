@@ -41,7 +41,8 @@ deploys to your own AWS account with one command. At personal scale it costs abo
    bun sst secret set WorkosAuthkitDomain https://<yours>.authkit.app --stage prod
    ```
    The rest are optional; leaving one unset turns its step off: `TypesafeApiKey`, `EmbeddingsApiKey`,
-   `AnthropicApiKey`, `ExpoAccessToken`. The first `sst secret set` also creates SST's state storage
+   `AnthropicApiKey`, `ExpoAccessToken`, and `WorkosApiKey` (the WorkOS secret key, `sk_…`, which
+   turns on the landing page's waitlist form; see [Waitlist](#waitlist)). The first `sst secret set` also creates SST's state storage
    in your account.
 
 ## Deploy
@@ -115,3 +116,11 @@ yourself a few dollars, and you pay the AI providers directly.
 ---
 
 [← AI assistants](ai-assistants.md) · Next: [Architecture and costs →](architecture.md)
+
+## Waitlist
+
+Sign-up is closed in AuthKit, and the WorkOS waitlist is on (Authentication → Features). People join
+from the landing page's form, which posts to the API's public `POST /v1/waitlist`; the API adds them to
+the WorkOS waitlist with the `WorkosApiKey` secret, and WorkOS emails a confirmation. Approve entries in
+the WorkOS dashboard (Users → Waitlist): each approval emails an invitation to create an account.
+Without the secret, the form answers that the waitlist isn't open.

@@ -28,6 +28,7 @@ requests and 1,000 saves a month, a 50 MB database, and the hourly sweep. The st
 | API Gateway (HTTP API) | Front door to the API and MCP | 1M requests, first 12 months on older accounts | ≈ $0.02 ($1 per million) |
 | CloudFront | Serves the web app and landing page | 1 TB and 10M requests, **always free** | $0 |
 | S3 | Static files, SST state and secrets | 5 GB, first 12 months | < $0.01 |
+| S3 + CloudFront (Previews) | Copies of link preview pictures, about 50 KB each | Same free tiers as above | < $0.01 |
 | EventBridge Scheduler | Hourly sweep | 14M invocations, **always free** | $0 |
 | CloudWatch Logs | Function logs, kept a week | 5 GB, **always free** | $0 |
 | Neon Postgres | The database, pgvector | Free plan: 100 CU-hours, 1 GB per project | $0 |
@@ -114,8 +115,9 @@ service.
 
 These hold everywhere in the code, and they're why the numbers add up:
 
-- **The user describes; the server never scrapes.** Sorting works from one human line, which keeps it
-  accurate and its AI input tiny.
+- **The user describes; sorting never reads the post.** Sorting works from one human line, which keeps
+  it accurate and its AI input tiny. The worker fetches a link's public preview (Open Graph or oEmbed)
+  once, only to show it on the card, and copies its picture to the Previews bucket.
 - **The cheapest model that can answer does.** Jev picks among existing categories; Claude only names
   new ones; embeddings are computed once per description.
 - **Your AI reasons on your plan.** The MCP server only does retrieval, so there are no AI tokens to

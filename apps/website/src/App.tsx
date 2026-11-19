@@ -93,7 +93,7 @@ const faqs = [
   },
   {
     q: "¿Cuándo lo puedo usar?",
-    a: "Estamos abriendo de a poco. Los primeros de la lista entran antes y con condición de fundador.",
+    a: "Estamos abriendo de a poco. Cuando llegue tu turno te llega un email para crear tu cuenta. Los primeros de la lista entran antes y con condición de fundador.",
   },
 ];
 
@@ -142,7 +142,7 @@ export default function App() {
               <div id="lista" className="flex w-full flex-col gap-3">
                 <WaitlistForm />
                 <p className="text-body-sm text-ink-soft">
-                  Sin spam. Te escribimos solo cuando abramos lugares.
+                  Sin spam. Te escribimos para confirmar y cuando abramos tu lugar.
                 </p>
               </div>
             }
@@ -232,9 +232,9 @@ export default function App() {
                 Lo encontrás por lo que es
               </h3>
               <p className="mt-3 text-body-md text-ink-soft">
-                No leemos los posts ni adivinamos por el link: vos contás de qué se trata en una
-                línea. Por eso funciona con cualquier app, y cada guardado se ordena por lo que
-                realmente es.
+                No adivinamos por el link: vos contás de qué se trata en una línea, y con eso se
+                ordena. Por eso funciona con cualquier app, y cada guardado queda donde realmente
+                va.
               </p>
               <CompareList
                 className="mt-6"

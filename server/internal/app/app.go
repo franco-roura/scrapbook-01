@@ -26,12 +26,16 @@ import (
 	"github.com/aaugoustis/waitlist/server/internal/db"
 	"github.com/aaugoustis/waitlist/server/internal/jobs"
 	"github.com/aaugoustis/waitlist/server/internal/mcpserver"
+	"github.com/aaugoustis/waitlist/server/internal/waitlist"
+	"github.com/aaugoustis/waitlist/server/internal/preview"
 	"github.com/aaugoustis/waitlist/server/internal/push"
 )
 
-// Enqueuer queues an item for classification.
+// Enqueuer queues an item for classification or a preview fetch.
 type Enqueuer interface {
 	EnqueueClassify(ctx context.Context, itemID uuid.UUID) error
+	// EnqueuePreview fetches a new link's preview (title, image).
+	EnqueuePreview(ctx context.Context, itemID uuid.UUID) error
 }
 
 // Core holds what both the HTTP side and the workers need.
@@ -42,6 +46,7 @@ type Core struct {
 	Queries    *db.Queries
 	Ledger     *credits.Ledger
 	Classifier *classify.Classifier
+	Previews   *preview.Runner
 }
 
 // NewCore builds the database queries, credit ledger and classifier.
@@ -50,7 +55,25 @@ func NewCore(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) *Core {
 	ledger := &credits.Ledger{Q: q, Starter: cfg.StarterCredits}
 	c := newClassifier(cfg, q, log)
 	c.Credits = ledger
-	return &Core{Cfg: cfg, Log: log, Pool: pool, Queries: q, Ledger: ledger, Classifier: c}
+	return &Core{Cfg: cfg, Log: log, Pool: pool, Queries: q, Ledger: ledger, Classifier: c,
+		Previews: newPreviews(cfg, q, log)}
+}
+
+// newPreviews builds the preview fetcher, with an S3 copy of each image when
+// a bucket is configured.
+func newPreviews(cfg config.Config, q db.Querier, log *slog.Logger) *preview.Runner {
+	r := &preview.Runner{Q: q, Fetch: preview.NewFetcher(), Log: log}
+	if cfg.PreviewBucket == "" || cfg.PreviewBaseURL == "" {
+		log.Warn("preview: PREVIEW_BUCKET/PREVIEW_BASE_URL not set; keeping links' own image URLs")
+		return r
+	}
+	store, err := preview.NewS3Store(context.Background(), cfg.PreviewBucket, cfg.PreviewBaseURL)
+	if err != nil {
+		log.Error("preview: no image store", "err", err)
+		return r
+	}
+	r.Store = store
+	return r
 }
 
 // Handler serves the app's API, the MCP endpoint and its OAuth metadata. It
@@ -74,7 +97,7 @@ func (c *Core) Handler(ctx context.Context, enq Enqueuer) (http.Handler, error) 
 	root := http.NewServeMux()
 	root.Handle(mcpserver.Path, mcpHandler)
 	root.Handle("/.well-known/", mcpHandler)
-	root.Handle("/", api.New(api.Options{
+	apiOpts := api.Options{
 		Queries:     c.Queries,
 		Logger:      c.Log,
 		Verifier:    verifier,
@@ -82,8 +105,34 @@ func (c *Core) Handler(ctx context.Context, enq Enqueuer) (http.Handler, error) 
 		CORSOrigins: c.Cfg.CORSOrigins,
 		Enqueuer:    enq,
 		Credits:     c.Ledger,
-	}).Handler())
+	}
+	if c.Cfg.WorkOSAPIKey != "" {
+		apiOpts.Waitlist = &waitlist.WorkOS{APIKey: c.Cfg.WorkOSAPIKey, BaseURL: c.Cfg.WorkOSAPIURL}
+	} else {
+		c.Log.Warn("WORKOS_API_KEY unset: the waitlist endpoint is off")
+	}
+	root.Handle("/", api.New(apiOpts).Handler())
 	return root, nil
+}
+
+// SweepPreviews fetches up to limit recent previews that were never
+// attempted, until ctx ends.
+func (c *Core) SweepPreviews(ctx context.Context, limit int32) (done int, err error) {
+	ids, err := c.Queries.ItemsNeedingPreview(ctx, limit)
+	if err != nil {
+		return 0, err
+	}
+	for _, id := range ids {
+		if ctx.Err() != nil {
+			break
+		}
+		if _, err := c.Previews.Run(ctx, id); err != nil {
+			c.Log.WarnContext(ctx, "sweep: preview failed", "item", id, "err", err)
+			continue
+		}
+		done++
+	}
+	return done, nil
 }
 
 // Sweep classifies up to limit items whose classification was missed (a

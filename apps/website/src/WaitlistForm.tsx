@@ -32,11 +32,19 @@ export function WaitlistForm({ onSignal = false }: { onSignal?: boolean }) {
     }
     setSending(true);
     try {
-      await submit(values);
+      const outcome = await submit(values);
       setValues({ name: "", email: "" });
-      toast.success("¡Listo! Ya estás en la lista. Te escribimos cuando abramos tu lugar");
-    } catch {
-      toast.error("No pudimos anotarte. Probá de nuevo en un minuto");
+      if (outcome === "already_user") {
+        toast.success("Ya tenés cuenta. Entrá desde la app con tu email");
+      } else {
+        toast.success(
+          "¡Listo! Ya estás en la lista. Cuando abramos tu lugar te llega un email para crear tu cuenta",
+        );
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "No pudimos anotarte. Probá de nuevo en un minuto",
+      );
     } finally {
       setSending(false);
     }

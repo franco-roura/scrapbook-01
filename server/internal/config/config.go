@@ -23,6 +23,9 @@ type Config struct {
 	WorkOSClientID string
 	// WorkOSAPIURL is the WorkOS API origin, or your custom auth domain.
 	WorkOSAPIURL string
+	// WorkOSAPIKey is the environment's secret key (sk_...). Optional: it
+	// turns on POST /v1/waitlist, which adds people to the AuthKit waitlist.
+	WorkOSAPIKey string
 	// AuthKitDomain is the AuthKit origin (e.g. https://abc-123.authkit.app).
 	// It issues the tokens MCP clients (Claude, ChatGPT) use.
 	AuthKitDomain string
@@ -75,6 +78,12 @@ type Config struct {
 	// List prices in dollars per million tokens, for metering.
 	JevPrice, EmbeddingsPrice, NamerInputPrice, NamerOutputPrice float64
 
+	// PreviewBucket is the S3 bucket for preview image copies, served at
+	// PreviewBaseURL (set by SST). Unset locally: previews keep the link's
+	// own image URL, which may expire.
+	PreviewBucket  string
+	PreviewBaseURL string
+
 	// ExpoAccessToken is optional (needed only with Expo push security on).
 	ExpoAccessToken string
 
@@ -93,6 +102,7 @@ func Load() (Config, error) {
 		MigrateOnStart:  env("MIGRATE_ON_START", "true") == "true",
 		WorkOSClientID:  os.Getenv("WORKOS_CLIENT_ID"),
 		WorkOSAPIURL:    strings.TrimRight(env("WORKOS_API_URL", "https://api.workos.com"), "/"),
+		WorkOSAPIKey:    os.Getenv("WORKOS_API_KEY"),
 		AuthKitDomain:   strings.TrimRight(os.Getenv("WORKOS_AUTHKIT_DOMAIN"), "/"),
 		WorkOSIssuer:    os.Getenv("WORKOS_ISSUER"),
 		DevJWTSecret:    os.Getenv("DEV_JWT_SECRET"),
@@ -111,6 +121,8 @@ func Load() (Config, error) {
 		NamerModel:         env("CATEGORY_NAMER_MODEL", "claude-haiku-5-5"),
 		NamerEnabled:       env("CATEGORY_NAMER_ENABLED", "true") == "true",
 		ExpoAccessToken:    os.Getenv("EXPO_ACCESS_TOKEN"),
+		PreviewBucket:      os.Getenv("PREVIEW_BUCKET"),
+		PreviewBaseURL:     strings.TrimRight(os.Getenv("PREVIEW_BASE_URL"), "/"),
 	}
 	var errs []error
 	floatEnv := func(key, fallback string, dst *float64) {

@@ -48,8 +48,9 @@ The app and the website are in Uruguayan Spanish; the code and these docs are in
     </td>
     <td width="50%" valign="top">
       <b>Your words, not a scraper</b><br>
-      You type one line about what it is. Nothing is scraped and nothing is guessed from the link,
-      so it works for every app and stays accurate. <a href="docs/features.md#saving">Saving →</a>
+      You type one line about what it is, and that's what sorting reads. The link's public preview
+      (title and picture) is only shown on the card, so it works for every app and stays accurate.
+      <a href="docs/features.md#saving">Saving →</a>
     </td>
   </tr>
   <tr>
