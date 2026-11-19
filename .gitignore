@@ -4,3 +4,7 @@ sst-env.d.ts
 # Lambda binaries sst.config.ts compiles
 .build/
 node_modules/
+# Local editor and agent settings
+.claude/
+.mcp.json
+CLAUDE.local.md
