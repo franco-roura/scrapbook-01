@@ -74,6 +74,12 @@
             "text/*"
           ]
         }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/"
+        }
       ]
     ],
     "experiments": {

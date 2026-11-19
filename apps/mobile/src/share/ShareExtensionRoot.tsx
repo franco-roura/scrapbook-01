@@ -1,7 +1,8 @@
 // Root of the iOS share extension bundle (index.share.js). It shares the
 // keychain session with the app, so no sign-in happens here.
+import * as Sentry from '@sentry/react-native';
 import { close, openHostApp, type InitialProps } from 'expo-share-extension';
-import { Component, useEffect, useState, type ReactNode } from 'react';
+import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { api } from '../lib/client';
@@ -21,7 +22,8 @@ function Sheet({ url, text }: Pick<InitialProps, 'url' | 'text'>) {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
-    getSession()
+    // How long the sheet takes to show the form (reading the shared keychain).
+    Sentry.startSpan({ name: 'share.load', op: 'ui.load' }, () => getSession())
       .then((s) => setSignedIn(Boolean(s)))
       .catch(() => setSignedIn(false));
   }, []);
@@ -54,6 +56,10 @@ class ExtensionErrorBoundary extends Component<{ children: ReactNode }, { error:
 
   static getDerivedStateFromError(error: Error) {
     return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    Sentry.captureException(error, { contexts: { react: { componentStack: info.componentStack ?? '' } } });
   }
 
   render() {

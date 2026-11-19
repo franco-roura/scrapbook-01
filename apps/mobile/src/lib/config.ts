@@ -10,6 +10,15 @@ export const config = {
   // ("group." + ios.bundleIdentifier). Keychain items in this group are
   // readable by the app and its share extension.
   iosAppGroup: 'group.com.scrapbook01.app',
+  // Optional error and performance reporting. Empty: Sentry stays off and
+  // nothing is sent (the default for self-hosters).
+  sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? '',
+  sentryTracesSampleRate: sampleRate(process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE),
 };
+
+function sampleRate(raw: string | undefined): number {
+  const n = raw === undefined || raw.trim() === '' ? 1 : Number(raw);
+  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1;
+}
 
 export const isConfigured = Boolean(config.workosClientId);
