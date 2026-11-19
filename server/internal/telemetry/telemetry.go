@@ -34,6 +34,8 @@ type Options struct {
 	// Lambda sends each event before the request returns instead of from a
 	// background goroutine, so nothing outlives the invocation.
 	Lambda bool
+	// Debug logs what the SDK sends, to stderr.
+	Debug bool
 	// Transport overrides how events are sent (tests).
 	Transport sentry.Transport
 }
@@ -49,6 +51,7 @@ func Init(o Options) (flush func(), err error) {
 	}
 	opts := sentry.ClientOptions{
 		Dsn:              o.DSN,
+		Debug:            o.Debug,
 		Environment:      o.Environment,
 		Release:          "scrapbook01-server@" + Version,
 		EnableTracing:    o.TracesSampleRate > 0,

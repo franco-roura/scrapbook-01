@@ -26,7 +26,7 @@ func Pool(ctx context.Context, url string) (*pgxpool.Pool, error) {
 func InitTelemetry(cfg config.Config, component string, lambda bool) (flush func(), err error) {
 	return telemetry.Init(telemetry.Options{
 		DSN: cfg.SentryDSN, Environment: cfg.SentryEnvironment, TracesSampleRate: cfg.SentryTracesSampleRate,
-		Component: component, Lambda: lambda,
+		Component: component, Lambda: lambda, Debug: cfg.SentryDebug,
 	})
 }
 

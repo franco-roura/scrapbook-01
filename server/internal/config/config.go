@@ -92,6 +92,8 @@ type Config struct {
 	SentryDSN              string
 	SentryEnvironment      string
 	SentryTracesSampleRate float64
+	// SentryDebug logs what the Sentry SDK sends, for checking a setup.
+	SentryDebug bool
 
 	ShutdownTimeout time.Duration
 }
@@ -131,6 +133,7 @@ func Load() (Config, error) {
 		PreviewBaseURL:     strings.TrimRight(os.Getenv("PREVIEW_BASE_URL"), "/"),
 		SentryDSN:          os.Getenv("SENTRY_DSN"),
 		SentryEnvironment:  env("SENTRY_ENVIRONMENT", "development"),
+		SentryDebug:        env("SENTRY_DEBUG", "false") == "true",
 	}
 	var errs []error
 	floatEnv := func(key, fallback string, dst *float64) {
