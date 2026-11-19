@@ -5,13 +5,18 @@ import { useAuth } from '../lib/auth';
 import { signOut } from '../lib/push';
 import { Text } from './module01';
 
-/** The library header's right side: Credits and Sign out. */
+/** The library header's right side: Connect AI, Credits and Sign out. */
 export function HeaderActions() {
   const { session } = useAuth();
   if (!session) return null;
   return (
     // The web header has no right inset of its own; match the title's.
     <View className={`flex-row items-center gap-4 ${Platform.OS === 'web' ? 'pr-4' : ''}`}>
+      <Pressable accessibilityRole="button" hitSlop={8} onPress={() => router.push('/connect-ai')}>
+        <Text variant="label" className="text-signal-ink">
+          Conectar IA
+        </Text>
+      </Pressable>
       <Pressable accessibilityRole="button" hitSlop={8} onPress={() => router.push('/credits')}>
         <Text variant="label" className="text-signal-ink">
           Créditos
