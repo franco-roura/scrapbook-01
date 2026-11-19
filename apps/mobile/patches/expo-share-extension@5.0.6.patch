@@ -1,5 +1,8 @@
+diff --git a/node_modules/expo-share-extension/.bun-tag-8d22010c475a1dfd b/.bun-tag-8d22010c475a1dfd
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/plugin/swift/ShareExtensionViewController.swift b/plugin/swift/ShareExtensionViewController.swift
-index 7f9f6d84323d9fdcc80b23a661f76af8dd8bf793..7ce1c50ad249981aeb990ccab3df831c3a32ac94 100644
+index 7f9f6d84323d9fdcc80b23a661f76af8dd8bf793..e6d71e1e754bd8f9ca588aa6fade8da251cf9774 100644
 --- a/plugin/swift/ShareExtensionViewController.swift
 +++ b/plugin/swift/ShareExtensionViewController.swift
 @@ -2,6 +2,10 @@ import UIKit
@@ -31,3 +34,34 @@ index 7f9f6d84323d9fdcc80b23a661f76af8dd8bf793..7ce1c50ad249981aeb990ccab3df831c
        
        var initialProps = sharedData ?? [:]
        
+@@ -140,24 +144,12 @@ class ShareExtensionViewController: UIViewController {
+   private func configureRootView(_ rootView: UIView, withBackgroundColorDict dict: [String: CGFloat]?, withHeight: CGFloat?) {
+     rootView.backgroundColor = backgroundColor(from: dict)
+ 
+-    // Get the screen bounds
+-    let screenBounds = UIScreen.main.bounds
+-
+-    // Calculate proper frame
+-    let frame: CGRect
+-    if let withHeight = withHeight {
+-      rootView.autoresizingMask = [.flexibleWidth, .flexibleTopMargin]
+-      frame = CGRect(
+-        x: 0,
+-        y: screenBounds.height - withHeight,
+-        width: screenBounds.width,
+-        height: withHeight
+-      )
+-    } else {
+-      rootView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+-      frame = screenBounds
+-    }
+-    rootView.frame = frame
++    // Fill this controller's view, not the screen. iOS presents the extension
++    // as a sheet whose view starts partway down the screen, so a frame computed
++    // from UIScreen bounds (`screenHeight - height`, or the full screen) puts the
++    // content below the visible area. `withHeight` is ignored for that reason.
++    rootView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
++    rootView.frame = view.bounds
+   }
+   
+   private func setupLoadingIndicator() {

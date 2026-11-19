@@ -102,7 +102,7 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
-            autoFocus
+            autoFocus={!plain}
             returnKeyType="next"
             onSubmitEditing={() => descriptionRef.current?.focus()}
             error={manualUrl && !link ? 'Pegá el link completo, que empiece con https://' : null}
@@ -118,7 +118,9 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
           placeholder="5 tradiciones para hacer con tu hija"
           multiline
           maxLength={DESCRIPTION_MAX}
-          autoFocus={Boolean(url)}
+          // The iOS extension's sheet is short: an open keyboard would cover
+          // the buttons before the person has seen them.
+          autoFocus={Boolean(url) && !plain}
           editable={!busy}
           accessibilityHint="Opcional. Describilo ahora o después desde Sin describir."
         />
@@ -148,7 +150,7 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
 function Frame({ children }: { children: React.ReactNode }) {
   return (
     <KeyboardAvoidingView className="flex-1 bg-canvas" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerClassName="p-6" keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerClassName="p-6" keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {children}
       </ScrollView>
     </KeyboardAvoidingView>
