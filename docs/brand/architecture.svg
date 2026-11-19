@@ -51,6 +51,8 @@
   <text x="1000" y="680" class="hud" font-size="10.5" fill="#7c818a">SORT + LINK</text>
   <path d="M902 720 H1240 V810 H1300" fill="none" stroke="#53575e" stroke-width="2" marker-end="url(#head-soft)"/>
   <text x="1000" y="710" class="hud" font-size="10.5" fill="#7c818a">PUSH</text>
+  <path d="M902 740 H1228 V930 H1300" fill="none" stroke="#53575e" stroke-width="2" marker-end="url(#head-soft)"/>
+  <text x="1000" y="760" class="hud" font-size="10.5" fill="#7c818a">ERRORS · TRACES</text>
   <path d="M288 870 H360" fill="none" stroke="#7c818a" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#head-mark)"/>
   <g transform="translate(52 240)">
     <rect width="236" height="100" rx="14" fill="#ffffff" stroke="#c9ccd2" filter="url(#mold)"/>
@@ -218,6 +220,17 @@
     </g>
   </g>
   <g transform="translate(1306 880)">
+    <rect width="236" height="100" rx="14" fill="#ffffff" stroke="#c9ccd2" filter="url(#mold)"/>
+    <rect x="14" y="16" width="48" height="48" rx="10" fill="#e7e9ec"/>
+    <g transform="translate(24 26) scale(1.1667)"><g fill="none" stroke="#1c1e21" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></g></g>
+    <text x="76" y="38" class="name">Sentry (optional)</text>
+    <text x="76" y="58" class="sub">ERRORS · TRACES</text>
+    <g transform="translate(76 68)">
+      <rect width="107" height="20" rx="10" fill="#ff5f1f"/>
+      <text x="8" y="14" class="cost">$0 free plan</text>
+    </g>
+  </g>
+  <g transform="translate(666 820)">
     <path d="M0 0 H212 L236 24 V100 H0 Z" fill="#ff5f1f"/>
     <text x="16" y="28" class="hud" font-size="11" fill="#1c1e21">EST. HOSTING PER MONTH</text>
     <text x="16" y="78" class="disp" font-size="34" fill="#1c1e21">≈ $0.02</text>

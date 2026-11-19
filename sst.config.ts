@@ -31,7 +31,24 @@ export default $config({
       embeddingsApiKey: new sst.Secret("EmbeddingsApiKey", ""),
       anthropicApiKey: new sst.Secret("AnthropicApiKey", ""),
       expoAccessToken: new sst.Secret("ExpoAccessToken", ""),
+      // Optional Sentry (errors and performance), one project per surface.
+      // An empty DSN turns reporting off for that surface.
+      sentryDsnServer: new sst.Secret("SentryDsnServer", ""),
+      sentryDsnMobile: new sst.Secret("SentryDsnMobile", ""),
+      sentryDsnWebsite: new sst.Secret("SentryDsnWebsite", ""),
+      // Uploads source maps at build time; optional even with a DSN.
+      sentryAuthToken: new sst.Secret("SentryAuthToken", ""),
+      sentryOrg: new sst.Secret("SentryOrg", ""),
     };
+    // Sentry project slugs, for the source map upload (override with
+    // SENTRY_PROJECT_MOBILE / SENTRY_PROJECT_WEBSITE when deploying).
+    const sentryProject = {
+      mobile: process.env.SENTRY_PROJECT_MOBILE ?? "scrapbook01-mobile",
+      website: process.env.SENTRY_PROJECT_WEBSITE ?? "scrapbook01-website",
+    };
+    // Releases in Sentry match the repo version (package.json).
+    const { readFileSync } = await import("node:fs");
+    const version: string = JSON.parse(readFileSync(`${$cli.paths.root}/package.json`, "utf8")).version;
 
     // Settings both Lambdas read through config.Load().
     const shared = {
@@ -45,6 +62,8 @@ export default $config({
       EMBEDDINGS_API_KEY: secret.embeddingsApiKey.value,
       ANTHROPIC_API_KEY: secret.anthropicApiKey.value,
       EXPO_ACCESS_TOKEN: secret.expoAccessToken.value,
+      SENTRY_DSN: secret.sentryDsnServer.value,
+      SENTRY_ENVIRONMENT: $app.stage,
     };
     const goFunction = {
       runtime: "provided.al2023" as const,
@@ -62,7 +81,8 @@ export default $config({
     const buildGo = (name: string) => {
       execFileSync(
         "go",
-        ["build", "-tags", "lambda.norpc", "-trimpath", "-ldflags", "-s -w",
+        ["build", "-tags", "lambda.norpc", "-trimpath", "-ldflags",
+         `-s -w -X github.com/franco-roura/scrapbook-01/server/internal/telemetry.Version=${version}`,
          "-o", `../.build/${name}/bootstrap`, `./cmd/${name}`],
         {
           cwd: `${$cli.paths.root}/server`,
@@ -115,6 +135,10 @@ export default $config({
       environment: {
         EXPO_PUBLIC_API_URL: api.url,
         EXPO_PUBLIC_WORKOS_CLIENT_ID: secret.workosClientId.value,
+        EXPO_PUBLIC_SENTRY_DSN: secret.sentryDsnMobile.value,
+        SENTRY_AUTH_TOKEN: secret.sentryAuthToken.value,
+        SENTRY_ORG: secret.sentryOrg.value,
+        SENTRY_PROJECT: sentryProject.mobile,
       },
     });
 
@@ -123,7 +147,13 @@ export default $config({
     const landing = new sst.aws.StaticSite("Landing", {
       path: "apps/website",
       build: { command: "bun run build", output: "dist" },
-      environment: { VITE_API_URL: api.url },
+      environment: {
+        VITE_API_URL: api.url,
+        VITE_SENTRY_DSN: secret.sentryDsnWebsite.value,
+        SENTRY_AUTH_TOKEN: secret.sentryAuthToken.value,
+        SENTRY_ORG: secret.sentryOrg.value,
+        SENTRY_PROJECT: sentryProject.website,
+      },
     });
 
     api.route("$default", {

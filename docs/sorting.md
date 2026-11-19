@@ -1,4 +1,4 @@
-[← README](../README.md) · [Features](features.md) · [Getting started](getting-started.md) · **Sorting** · [AI assistants](ai-assistants.md) · [Self-hosting](self-hosting.md) · [Architecture](architecture.md) · [Development](development.md)
+[← README](../README.md) · [Features](features.md) · [Getting started](getting-started.md) · **Sorting** · [AI assistants](ai-assistants.md) · [Self-hosting](self-hosting.md) · [Architecture](architecture.md) · [Observability](observability.md) · [Development](development.md)
 
 # How saves get sorted
 
