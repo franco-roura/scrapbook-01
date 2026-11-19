@@ -11,6 +11,8 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/franco-roura/scrapbook-01/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/franco-roura/scrapbook-01/ci.yml?branch=main&style=flat-square&label=CI"></a>
+  <a href="https://github.com/franco-roura/scrapbook-01/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/franco-roura/scrapbook-01?style=flat-square&color=53575e"></a>
   <img alt="Go" src="https://img.shields.io/badge/API-Go-1c1e21?style=flat-square&logo=go">
   <img alt="Expo" src="https://img.shields.io/badge/app-Expo%20%2F%20React%20Native-1c1e21?style=flat-square&logo=expo">
   <img alt="MCP" src="https://img.shields.io/badge/AI-MCP%20server-1c1e21?style=flat-square">
@@ -34,6 +36,7 @@ The app and the website are in Uruguayan Spanish; the code and these docs are in
 - [Up and running in five minutes](#up-and-running-in-five-minutes)
 - [Serverless, so it costs cents](#serverless-so-it-costs-cents)
 - [Status](#status)
+- [Who's behind it](#whos-behind-it)
 - [Contributing](#contributing)
 - [Security and license](#security-and-license)
 
@@ -140,16 +143,25 @@ prepaid credits.
 
 ## Status
 
-Early, and built in the open. The Go API, the MCP server, sorting, credits and the web app are tested
+Early, and built in the open: the current release is
+[v0.1.0](https://github.com/franco-roura/scrapbook-01/releases). The Go API, the MCP server, sorting, credits and the web app are tested
 and run locally. Not yet proven on real hardware or accounts: the iOS share extension and push
 notifications on a device, a first AWS deploy, and payments for credit packs (packs can be granted by
 hand for now). Issues and pull requests are welcome.
+
+## Who's behind it
+
+Scrapbook/01 is built by its cofounders, [Franco Roura](https://github.com/franco-roura) and
+[Alexis Augoustis](https://github.com/aaugoustis). It started as Alexis's waitlist page in
+[aaugoustis/waitlist](https://github.com/aaugoustis/waitlist) and moved here as the app grew; the full
+history came along.
 
 ## Contributing
 
 Bug reports, fixes and ideas are all welcome. The app is Expo (React Native) styled with the
 [Module/01](https://github.com/franco-roura/module-01) design system; the API is Go with sqlc and
-River.
+River. Every pull request adds a changeset, which becomes its line in the
+[changelog](CHANGELOG.md), and everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
 
 **[Read more: CONTRIBUTING.md →](CONTRIBUTING.md)** · **[Local development →](docs/development.md)**
 

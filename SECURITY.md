@@ -14,7 +14,8 @@ rather not be.
 
 ## Supported versions
 
-Only the latest `main` gets fixes. Self-hosted instances should update to it.
+Only the [latest release](https://github.com/franco-roura/scrapbook-01/releases/latest) gets fixes.
+Security fixes ship as a patch release; self-hosted instances should update to it.
 
 ## Scope
 
