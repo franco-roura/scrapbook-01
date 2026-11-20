@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+### Minor Changes
+
+- [#13](https://github.com/franco-roura/scrapbook-01/pull/13) [`0d17a34`](https://github.com/franco-roura/scrapbook-01/commit/0d17a34b1508688881c92f2a77444654b354f6ff) Thanks [@franco-roura](https://github.com/franco-roura)! - Add optional Sentry error and performance reporting for the API, MCP server, worker, app, share sheet and landing page. It stays off until you set the new `SentryDsnServer`, `SentryDsnMobile` and `SentryDsnWebsite` secrets; see docs/observability.md.
+
 ## 0.2.0
 
 ### Minor Changes
