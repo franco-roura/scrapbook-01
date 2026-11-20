@@ -10,6 +10,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 import { config } from './config';
+import { clearSentryUser, setSentryUser } from './sentry';
 
 export type Session = {
   accessToken: string;
@@ -50,8 +51,15 @@ export function onSessionChange(fn: (s: Session | null) => void): () => void {
   return () => listeners.delete(fn);
 }
 
+// Errors and spans carry the internal user uuid only (never the email).
+function reportUser(s: Session | null | undefined) {
+  if (s) void setSentryUser(s.user.id).catch(() => undefined);
+  else clearSentryUser();
+}
+
 export async function save(s: Session | null) {
   current = s;
+  reportUser(s);
   if (s) await storage.set(JSON.stringify(s));
   else await storage.remove();
   listeners.forEach((fn) => fn(s));
@@ -68,7 +76,10 @@ async function readStored(): Promise<Session | null> {
 
 /** The stored session, without refreshing it. */
 export async function getSession(): Promise<Session | null> {
-  if (current === undefined) current = await readStored();
+  if (current === undefined) {
+    current = await readStored();
+    reportUser(current);
+  }
   return current;
 }
 
@@ -137,6 +148,7 @@ async function refresh(s: Session): Promise<Session | null> {
     const stored = await readStored();
     if (stored && stored.refreshToken !== s.refreshToken) {
       current = stored;
+      reportUser(stored);
       return stored;
     }
     // Rejected for good (expired, revoked): sign out. Network trouble keeps
@@ -153,6 +165,7 @@ export async function accessToken(): Promise<string | null> {
   // The other process may have rotated the tokens, so re-read storage.
   const s = await readStored();
   current = s;
+  reportUser(s);
   if (!s) return null;
   if (s.expiresAt - Date.now() > 30_000) return s.accessToken;
   refreshing ??= refresh(s).finally(() => (refreshing = null));

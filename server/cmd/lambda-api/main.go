@@ -24,6 +24,11 @@ func main() {
 		log.Error("config", "err", err)
 		os.Exit(1)
 	}
+	// On Lambda each event is sent before the request returns, so there's
+	// nothing to flush.
+	if _, err := app.InitTelemetry(cfg, "api", true); err != nil {
+		log.Error("sentry: not reporting", "err", err)
+	}
 	enq, err := jobs.NewLambdaInvoker(ctx, cfg.WorkerFunctionName)
 	if err != nil {
 		log.Error("worker invoker", "err", err)

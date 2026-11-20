@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/anthropics/anthropic-sdk-go/v2"
 	"github.com/anthropics/anthropic-sdk-go/v2/option"
+
+	"github.com/franco-roura/scrapbook-01/server/internal/telemetry"
 )
 
 // Namer asks Claude Haiku for a short category name. It only runs when Jev
@@ -26,6 +29,8 @@ type Namer struct {
 // NewNamer builds a Namer. Extra options (base URL, retries) are mainly for
 // tests; the API key comes from the argument, or ANTHROPIC_API_KEY when empty.
 func NewNamer(apiKey, model string, opts ...option.RequestOption) *Namer {
+	// Traced HTTP first so tests' options can still replace it.
+	opts = append([]option.RequestOption{option.WithHTTPClient(&http.Client{Transport: telemetry.Transport(nil)})}, opts...)
 	if apiKey != "" {
 		opts = append([]option.RequestOption{option.WithAPIKey(apiKey)}, opts...)
 	}
@@ -45,7 +50,9 @@ Reply with the name only.`
 var ErrRefused = errors.New("category namer can't answer")
 
 // Name proposes a category name for description, avoiding the existing ones.
-func (n *Namer) Name(ctx context.Context, description string, existing []string) (string, error) {
+func (n *Namer) Name(ctx context.Context, description string, existing []string) (_ string, err error) {
+	ctx, span := telemetry.StartSpan(ctx, "gen_ai.chat", "claude name category "+n.model)
+	defer func() { span.End(err) }()
 	var prompt strings.Builder
 	prompt.WriteString("Item description:\n")
 	prompt.WriteString(description)

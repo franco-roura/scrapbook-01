@@ -7,6 +7,7 @@
     "@expo-google-fonts/michroma": "^0.4.2",
     "@expo-google-fonts/space-mono": "^0.4.2",
     "@franco_roura/module-01": "1.1.0",
+    "@sentry/react-native": "~8.28.0",
     "expo": "~58.0.26",
     "expo-auth-session": "~58.0.19",
     "expo-clipboard": "~58.0.4",

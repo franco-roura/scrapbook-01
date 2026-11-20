@@ -19,6 +19,7 @@ import (
 	"github.com/franco-roura/scrapbook-01/server/internal/classify"
 	"github.com/franco-roura/scrapbook-01/server/internal/db"
 	"github.com/franco-roura/scrapbook-01/server/internal/preview"
+	"github.com/franco-roura/scrapbook-01/server/internal/telemetry"
 )
 
 // ClassifyArgs asks for one item to be (re)classified.
@@ -55,7 +56,9 @@ type classifyWorker struct {
 
 func (w *classifyWorker) Timeout(*river.Job[ClassifyArgs]) time.Duration { return 90 * time.Second }
 
-func (w *classifyWorker) Work(ctx context.Context, job *river.Job[ClassifyArgs]) error {
+func (w *classifyWorker) Work(ctx context.Context, job *river.Job[ClassifyArgs]) (err error) {
+	ctx, finish := telemetry.Job(ctx, "worker classify", "", "")
+	defer func() { finish(err) }()
 	res, err := w.c.Run(ctx, job.Args.ItemID)
 	if err != nil {
 		return err
@@ -85,8 +88,10 @@ type previewWorker struct {
 
 func (w *previewWorker) Timeout(*river.Job[PreviewArgs]) time.Duration { return 45 * time.Second }
 
-func (w *previewWorker) Work(ctx context.Context, job *river.Job[PreviewArgs]) error {
-	_, err := w.r.Run(ctx, job.Args.ItemID)
+func (w *previewWorker) Work(ctx context.Context, job *river.Job[PreviewArgs]) (err error) {
+	ctx, finish := telemetry.Job(ctx, "worker preview", "", "")
+	defer func() { finish(err) }()
+	_, err = w.r.Run(ctx, job.Args.ItemID)
 	return err
 }
 

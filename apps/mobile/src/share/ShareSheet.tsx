@@ -1,6 +1,7 @@
 // The "What is it about?" sheet. The same component runs inside the iOS
 // share extension and as the Android share screen, so it takes everything
 // platform-specific (closing, opening the app) as props.
+import * as Sentry from '@sentry/react-native';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 
@@ -42,7 +43,9 @@ export function ShareSheet({ api, sharedText, signedIn, onSaved, onCancel, onSig
     try {
       // Send the full shared text when we have it: the server extracts and
       // cleans the link the same way for every caller.
-      const item = await api.saveItem(url ? (sharedText as string) : manualUrl, description);
+      const item = await Sentry.startSpan({ name: 'share.save', op: 'function' }, () =>
+        api.saveItem(url ? (sharedText as string) : manualUrl, description),
+      );
       setState({ kind: 'saved', item });
       savedTimer.current = setTimeout(() => onSaved(item), 700);
     } catch (e) {

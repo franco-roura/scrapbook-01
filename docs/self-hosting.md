@@ -1,4 +1,4 @@
-[← README](../README.md) · [Features](features.md) · [Getting started](getting-started.md) · [Sorting](sorting.md) · [AI assistants](ai-assistants.md) · **Self-hosting** · [Architecture](architecture.md) · [Development](development.md)
+[← README](../README.md) · [Features](features.md) · [Getting started](getting-started.md) · [Sorting](sorting.md) · [AI assistants](ai-assistants.md) · **Self-hosting** · [Architecture](architecture.md) · [Observability](observability.md) · [Development](development.md)
 
 # Host it yourself on AWS
 
@@ -24,6 +24,8 @@ deploys to your own AWS account with one command. At personal scale it costs abo
 - Go, Bun, and this repository.
 - AI keys, all optional: [Jev](https://typesafe.ai), an OpenAI-compatible embeddings API
   ([OpenRouter](https://openrouter.ai) by default) and [Anthropic](https://console.anthropic.com).
+- Optionally, a **[Sentry](https://sentry.io)** account (the free plan is enough) for errors and
+  performance. See [Observability](observability.md).
 
 ## One-time setup
 
@@ -47,6 +49,18 @@ deploys to your own AWS account with one command. At personal scale it costs abo
    `AnthropicApiKey`, `ExpoAccessToken`, and `WorkosApiKey` (the WorkOS secret key, `sk_…`, which
    turns on the landing page's waitlist form; see [Waitlist](#waitlist)). The first `sst secret set` also creates SST's state storage
    in your account.
+4. **Sentry (optional).** Skip this step to send nothing anywhere. Otherwise create three Sentry projects
+   (Go, React Native and React), named `scrapbook01-server`, `scrapbook01-mobile` and
+   `scrapbook01-website`, and set each one's DSN:
+   ```bash
+   bun sst secret set SentryDsnServer https://…@….ingest.sentry.io/… --stage prod
+   bun sst secret set SentryDsnMobile https://…@….ingest.sentry.io/… --stage prod
+   bun sst secret set SentryDsnWebsite https://…@….ingest.sentry.io/… --stage prod
+   ```
+   Each DSN is independent: set only the ones you want. For readable stack traces in the web builds,
+   also set `SentryOrg` (your organization's slug) and `SentryAuthToken` (an organization token with
+   the default scopes). If you named your projects differently, deploy with
+   `SENTRY_PROJECT_MOBILE` and `SENTRY_PROJECT_WEBSITE` set to their slugs.
 
 ## Deploy
 
@@ -69,6 +83,10 @@ Tell WorkOS about the new addresses:
 
 For the phone builds, set `EXPO_PUBLIC_API_URL=<api>` when building, and add
 `scrapbook01://auth/callback` to the redirects.
+`apps/mobile/eas.json` uploads source maps and dSYMs to Sentry: change its `SENTRY_ORG` and
+`SENTRY_PROJECT` to yours and add `SENTRY_AUTH_TOKEN` as an EAS secret, along with
+`EXPO_PUBLIC_SENTRY_DSN` (the mobile project's DSN) in the EAS environment. Without Sentry, set
+`SENTRY_DISABLE_AUTO_UPLOAD` to `"true"` there instead, or the builds fail.
 
 ## Check it works
 

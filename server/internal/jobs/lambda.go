@@ -11,6 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/google/uuid"
+
+	"github.com/franco-roura/scrapbook-01/server/internal/telemetry"
 )
 
 // On AWS there is no River: the API invokes the worker Lambda asynchronously
@@ -26,6 +28,10 @@ type WorkerEvent struct {
 	PreviewItemID uuid.UUID `json:"previewItemId,omitzero"`
 	// Sweep runs the catch-up pass instead.
 	Sweep bool `json:"sweep,omitzero"`
+	// SentryTrace and Baggage continue the queuing request's Sentry trace,
+	// when telemetry is on.
+	SentryTrace string `json:"sentryTrace,omitzero"`
+	Baggage     string `json:"baggage,omitzero"`
 }
 
 // LambdaInvoker enqueues by invoking the worker Lambda asynchronously.
@@ -57,6 +63,7 @@ func (l *LambdaInvoker) EnqueuePreview(ctx context.Context, itemID uuid.UUID) er
 }
 
 func (l *LambdaInvoker) invoke(ctx context.Context, ev WorkerEvent) error {
+	ev.SentryTrace, ev.Baggage = telemetry.TraceHeaders(ctx)
 	payload, err := json.Marshal(ev)
 	if err != nil {
 		return err
@@ -77,8 +84,27 @@ type Worker struct {
 	Sweep    func(ctx context.Context) (int, error)
 }
 
-// Handle routes one event. Returning an error makes Lambda retry it.
-func (w Worker) Handle(ctx context.Context, ev WorkerEvent) error {
+// Handle routes one event, as one Sentry transaction when telemetry is on.
+// Returning an error makes Lambda retry it.
+func (w Worker) Handle(ctx context.Context, ev WorkerEvent) (err error) {
+	ctx, finish := telemetry.Job(ctx, "worker "+ev.kind(), ev.SentryTrace, ev.Baggage)
+	defer func() { finish(err) }()
+	return w.handle(ctx, ev)
+}
+
+func (ev WorkerEvent) kind() string {
+	switch {
+	case ev.Sweep:
+		return "sweep"
+	case ev.PreviewItemID != uuid.Nil:
+		return "preview"
+	case ev.ItemID != uuid.Nil:
+		return "classify"
+	}
+	return "unknown"
+}
+
+func (w Worker) handle(ctx context.Context, ev WorkerEvent) error {
 	switch {
 	case ev.Sweep:
 		_, err := w.Sweep(ctx)

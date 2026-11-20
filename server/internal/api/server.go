@@ -14,6 +14,7 @@ import (
 	"github.com/franco-roura/scrapbook-01/server/internal/auth"
 	"github.com/franco-roura/scrapbook-01/server/internal/credits"
 	"github.com/franco-roura/scrapbook-01/server/internal/db"
+	"github.com/franco-roura/scrapbook-01/server/internal/telemetry"
 )
 
 // maxBody caps request bodies; a save is a URL plus a short description.
@@ -95,9 +96,9 @@ func (s *Server) routes(authMW func(http.Handler) http.Handler) http.Handler {
 	v1.HandleFunc("POST /v1/categories", s.createCategory)
 	v1.HandleFunc("PUT /v1/devices/{token}", s.registerDevice)
 	v1.HandleFunc("DELETE /v1/devices/{token}", s.unregisterDevice)
-	mux.Handle("/v1/", authMW(v1))
+	mux.Handle("/v1/", authMW(withTelemetryUser(telemetry.Routes(v1))))
 
-	return s.recoverer(s.logRequests(s.withCORS(mux)))
+	return s.recoverer(s.logRequests(s.withCORS(telemetry.Routes(mux))))
 }
 
 // withCORS answers preflight requests and adds CORS headers for allowed
@@ -115,7 +116,7 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 		h.Add("Vary", "Origin")
 		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
 			h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
-			h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, sentry-trace, baggage")
 			h.Set("Access-Control-Max-Age", "600")
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -135,6 +136,16 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// withTelemetryUser tags the request's Sentry events with the user's id.
+func withTelemetryUser(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if id, ok := auth.UserFrom(r.Context()); ok {
+			telemetry.SetUser(r.Context(), id.String())
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 type statusRecorder struct {
@@ -166,6 +177,7 @@ func (s *Server) recoverer(next http.Handler) http.Handler {
 					panic(v)
 				}
 				s.log.ErrorContext(r.Context(), "panic", "value", v)
+				telemetry.CapturePanic(r.Context(), v)
 				writeError(w, http.StatusInternalServerError, "internal", "Algo salió mal.")
 			}
 		}()

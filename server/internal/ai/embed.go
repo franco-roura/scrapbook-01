@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/franco-roura/scrapbook-01/server/internal/telemetry"
 )
 
 // Dimensions is the embedding size the database columns are declared with.
@@ -41,7 +43,9 @@ type embedResponse struct {
 }
 
 // Embed returns one vector per input, in input order.
-func (e *Embedder) Embed(ctx context.Context, inputs ...string) ([][]float32, error) {
+func (e *Embedder) Embed(ctx context.Context, inputs ...string) (_ [][]float32, err error) {
+	ctx, span := telemetry.StartSpan(ctx, "gen_ai.embeddings", "embeddings "+e.Model)
+	defer func() { span.End(err) }()
 	body, err := json.Marshal(embedRequest{Model: e.Model, Input: inputs})
 	if err != nil {
 		return nil, err

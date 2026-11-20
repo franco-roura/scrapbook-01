@@ -38,6 +38,7 @@ const cards: Record<string, Card> = {
   neon: { x: 1306, y: 420, icon: 'neon', name: 'Neon Postgres', sub: 'PGVECTOR · SLEEPS', cost: '$0 free plan' },
   ai: { x: 1306, y: 600, icon: 'sparkles', name: 'AI models', sub: 'JEV · HAIKU', cost: 'paid by credits' },
   push: { x: 1306, y: 760, icon: 'bell', name: 'Expo Push', sub: 'NOTIFICATIONS', cost: '$0' },
+  sentry: { x: 1306, y: 880, icon: 'activity', name: 'Sentry (optional)', sub: 'ERRORS · TRACES', cost: '$0 free plan' },
 };
 
 // [path, dashed?, label?, labelX, labelY]
@@ -58,6 +59,7 @@ const arrows: [string, boolean, string?, number?, number?][] = [
   ['M902 670 H1264 V505 H1300', false],
   ['M902 690 H1300', false, 'SORT + LINK', 1000, 680],
   ['M902 720 H1240 V810 H1300', false, 'PUSH', 1000, 710],
+  ['M902 740 H1228 V930 H1300', false, 'ERRORS · TRACES', 1000, 760],
   // Deploys
   ['M288 870 H360', true],
 ];
@@ -126,7 +128,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1040" wid
   <text x="1306" y="200" class="hud" font-size="12" fill="#7c818a">HOSTED ELSEWHERE</text>
 ${arrows.map(arrow).join('\n')}
 ${Object.values(cards).map(card).join('\n')}
-  <g transform="translate(1306 880)">
+  <g transform="translate(666 820)">
     <path d="M0 0 H212 L236 24 V100 H0 Z" fill="#ff5f1f"/>
     <text x="16" y="28" class="hud" font-size="11" fill="#1c1e21">EST. HOSTING PER MONTH</text>
     <text x="16" y="78" class="disp" font-size="34" fill="#1c1e21">≈ $0.02</text>

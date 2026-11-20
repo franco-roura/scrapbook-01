@@ -1,4 +1,4 @@
-[← README](../README.md) · **Features** · [Getting started](getting-started.md) · [Sorting](sorting.md) · [AI assistants](ai-assistants.md) · [Self-hosting](self-hosting.md) · [Architecture](architecture.md) · [Development](development.md)
+[← README](../README.md) · **Features** · [Getting started](getting-started.md) · [Sorting](sorting.md) · [AI assistants](ai-assistants.md) · [Self-hosting](self-hosting.md) · [Architecture](architecture.md) · [Observability](observability.md) · [Development](development.md)
 
 # Features
 

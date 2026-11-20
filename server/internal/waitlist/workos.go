@@ -13,6 +13,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/franco-roura/scrapbook-01/server/internal/telemetry"
 )
 
 // ErrAlreadyUser means the email already has an account: sign in instead.
@@ -67,7 +69,7 @@ func (w *WorkOS) Join(ctx context.Context, email, name string) (string, error) {
 	hreq.Header.Set("Content-Type", "application/json")
 	client := w.HTTP
 	if client == nil {
-		client = http.DefaultClient
+		client = tracedClient
 	}
 	res, err := client.Do(hreq)
 	if err != nil {
@@ -89,3 +91,5 @@ func (w *WorkOS) Join(ctx context.Context, email, name string) (string, error) {
 	}
 	return entry.State, nil
 }
+
+var tracedClient = &http.Client{Transport: telemetry.Transport(nil)}
