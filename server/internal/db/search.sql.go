@@ -13,12 +13,15 @@ import (
 )
 
 const searchItemsByText = `-- name: SearchItemsByText :many
-SELECT i.id, i.url, i.platform, i.description, i.created_at, c.name AS category_name, m.hits
+SELECT i.id, i.url, i.platform, i.description, i.created_at, c.name AS category_name,
+       a.summary AS analysis_summary, a.use_when AS analysis_use_when, m.hits
 FROM items i
 LEFT JOIN categories c ON c.id = i.category_id
+LEFT JOIN item_analyses a ON a.item_id = i.id
 CROSS JOIN LATERAL (
     SELECT count(*)::int AS hits FROM unnest($1::text[]) w
-    WHERE concat_ws(' ', i.description, i.url, c.name) ILIKE '%' || w || '%'
+    WHERE concat_ws(' ', i.description, i.url, c.name, a.summary, a.details,
+                    array_to_string(a.tags, ' '), array_to_string(a.use_when, ' ')) ILIKE '%' || w || '%'
 ) m
 WHERE i.user_id = $2
   AND ($3::text IS NULL OR lower(c.name) = lower($3::text))
@@ -35,17 +38,19 @@ type SearchItemsByTextParams struct {
 }
 
 type SearchItemsByTextRow struct {
-	ID           uuid.UUID
-	Url          string
-	Platform     string
-	Description  *string
-	CreatedAt    time.Time
-	CategoryName *string
-	Hits         int32
+	ID              uuid.UUID
+	Url             string
+	Platform        string
+	Description     *string
+	CreatedAt       time.Time
+	CategoryName    *string
+	AnalysisSummary *string
+	AnalysisUseWhen []string
+	Hits            int32
 }
 
-// Fallback when embeddings aren't available: items whose description, URL
-// or category contain the most query words.
+// Fallback when embeddings aren't available: items whose description, URL,
+// category or analysis contain the most query words.
 func (q *Queries) SearchItemsByText(ctx context.Context, arg SearchItemsByTextParams) ([]SearchItemsByTextRow, error) {
 	rows, err := q.db.Query(ctx, searchItemsByText,
 		arg.Words,
@@ -67,6 +72,8 @@ func (q *Queries) SearchItemsByText(ctx context.Context, arg SearchItemsByTextPa
 			&i.Description,
 			&i.CreatedAt,
 			&i.CategoryName,
+			&i.AnalysisSummary,
+			&i.AnalysisUseWhen,
 			&i.Hits,
 		); err != nil {
 			return nil, err
@@ -80,40 +87,65 @@ func (q *Queries) SearchItemsByText(ctx context.Context, arg SearchItemsByTextPa
 }
 
 const searchItemsByVector = `-- name: SearchItemsByVector :many
+WITH hits AS (
+    (SELECT i.id, (1 - (i.embedding <=> CAST($2::text AS vector)))::float8 AS score
+     FROM items i
+     LEFT JOIN categories c ON c.id = i.category_id
+     WHERE i.user_id = $3 AND i.embedding IS NOT NULL
+       AND ($4::text IS NULL OR lower(c.name) = lower($4::text))
+     ORDER BY i.embedding <=> CAST($2::text AS vector)
+     LIMIT $1)
+    UNION ALL
+    (SELECT a.item_id, (1 - (a.embedding <=> CAST($2::text AS vector)))::float8 AS score
+     FROM item_analyses a
+     JOIN items i ON i.id = a.item_id
+     LEFT JOIN categories c ON c.id = i.category_id
+     WHERE a.user_id = $3 AND a.embedding IS NOT NULL
+       AND ($4::text IS NULL OR lower(c.name) = lower($4::text))
+     ORDER BY a.embedding <=> CAST($2::text AS vector)
+     LIMIT $1)
+), best AS (
+    SELECT hits.id, max(hits.score)::float8 AS score FROM hits GROUP BY hits.id
+)
 SELECT i.id, i.url, i.platform, i.description, i.created_at, c.name AS category_name,
-       (1 - (i.embedding <=> CAST($1::text AS vector)))::float8 AS score
-FROM items i
+       a.summary AS analysis_summary, a.use_when AS analysis_use_when, best.score
+FROM best
+JOIN items i ON i.id = best.id
 LEFT JOIN categories c ON c.id = i.category_id
-WHERE i.user_id = $2 AND i.embedding IS NOT NULL
-  AND ($3::text IS NULL OR lower(c.name) = lower($3::text))
-ORDER BY i.embedding <=> CAST($1::text AS vector)
-LIMIT $4
+LEFT JOIN item_analyses a ON a.item_id = i.id
+ORDER BY best.score DESC, i.created_at DESC
+LIMIT $1
 `
 
 type SearchItemsByVectorParams struct {
+	Lim       int32
 	Embedding string
 	UserID    uuid.UUID
 	Category  *string
-	Lim       int32
 }
 
 type SearchItemsByVectorRow struct {
-	ID           uuid.UUID
-	Url          string
-	Platform     string
-	Description  *string
-	CreatedAt    time.Time
-	CategoryName *string
-	Score        float64
+	ID              uuid.UUID
+	Url             string
+	Platform        string
+	Description     *string
+	CreatedAt       time.Time
+	CategoryName    *string
+	AnalysisSummary *string
+	AnalysisUseWhen []string
+	Score           float64
 }
 
 // Nearest items to a query embedding (cosine), optionally in one category.
+// An item matches through its description or through its analysis, and
+// keeps the better of the two scores. Each side is its own nearest-neighbour
+// scan, so both HNSW indexes stay usable.
 func (q *Queries) SearchItemsByVector(ctx context.Context, arg SearchItemsByVectorParams) ([]SearchItemsByVectorRow, error) {
 	rows, err := q.db.Query(ctx, searchItemsByVector,
+		arg.Lim,
 		arg.Embedding,
 		arg.UserID,
 		arg.Category,
-		arg.Lim,
 	)
 	if err != nil {
 		return nil, err
@@ -129,6 +161,8 @@ func (q *Queries) SearchItemsByVector(ctx context.Context, arg SearchItemsByVect
 			&i.Description,
 			&i.CreatedAt,
 			&i.CategoryName,
+			&i.AnalysisSummary,
+			&i.AnalysisUseWhen,
 			&i.Score,
 		); err != nil {
 			return nil, err

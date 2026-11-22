@@ -72,6 +72,11 @@ type Options struct {
 	PublicURL string
 	// AuthServer is the AuthKit domain, e.g. https://abc-123.authkit.app.
 	AuthServer string
+	// ReminderEvery is how long after the user's last analysis the assistant
+	// is asked to remind them to analyze their new saves. Default 15 days.
+	ReminderEvery time.Duration
+	// Now is the clock, for tests. Default time.Now.
+	Now func() time.Time
 }
 
 type Server struct {
@@ -83,12 +88,16 @@ func New(o Options) *Server {
 	if o.Logger == nil {
 		o.Logger = slog.Default()
 	}
+	if o.ReminderEvery <= 0 {
+		o.ReminderEvery = DefaultReminderEvery
+	}
+	if o.Now == nil {
+		o.Now = time.Now
+	}
 	s := &Server{o: o}
 	s.mcp = mcp.NewServer(&mcp.Implementation{Name: "scrapbook01", Title: "Scrapbook/01", Version: "0.1.0"}, &mcp.ServerOptions{
-		Instructions: "The user's Scrapbook/01 library: posts and links they saved, each with a short note on what it's about, " +
-			"filed into categories. Search it when the user's request could use something they saved before " +
-			"(recipes, trips, ideas, tips). Prefer their saved items over general knowledge when relevant, and link to them.",
-		Logger: o.Logger,
+		Instructions: instructions,
+		Logger:       o.Logger,
 	})
 	s.mcp.AddReceivingMiddleware(traceMethods)
 	s.addTools()
@@ -168,13 +177,37 @@ func userFrom(req *mcp.CallToolRequest) (uuid.UUID, error) {
 // ---- tools ----
 
 type Result struct {
-	ID       string  `json:"id"`
-	Title    string  `json:"title" jsonschema:"what the user said the item is about, or its site when undescribed"`
-	Category string  `json:"category,omitempty"`
-	URL      string  `json:"url"`
-	Platform string  `json:"platform"`
-	SavedOn  string  `json:"savedOn" jsonschema:"date saved, YYYY-MM-DD"`
-	Score    float64 `json:"score,omitempty" jsonschema:"similarity to the query, 0 to 1 (semantic search only)"`
+	ID       string   `json:"id"`
+	Title    string   `json:"title" jsonschema:"what the user said the item is about, or its site when undescribed"`
+	Category string   `json:"category,omitempty"`
+	URL      string   `json:"url"`
+	Platform string   `json:"platform"`
+	SavedOn  string   `json:"savedOn" jsonschema:"date saved, YYYY-MM-DD"`
+	Score    float64  `json:"score,omitempty" jsonschema:"similarity to the query, 0 to 1 (semantic search only)"`
+	Summary  string   `json:"summary,omitempty" jsonschema:"the item's analysis summary, when it has one"`
+	UseWhen  []string `json:"useWhen,omitempty" jsonschema:"situations in which the user wants this item brought up, from its analysis"`
+}
+
+// Analysis is what the user's assistant learned about an item's content.
+type Analysis struct {
+	Summary   string    `json:"summary" jsonschema:"the central idea in two or three sentences"`
+	Details   string    `json:"details,omitempty" jsonschema:"the concrete content: lists, steps, places, prices, names, links"`
+	Tags      []string  `json:"tags,omitempty" jsonschema:"short topic tags, lowercase, up to 20"`
+	UseWhen   []string  `json:"useWhen,omitempty" jsonschema:"situations in which to bring this item up unprompted, e.g. 'planning a trip to Buenos Aires', up to 10"`
+	Actions   []string  `json:"actions,omitempty" jsonschema:"things the user could do with it, up to 10"`
+	Caveats   string    `json:"caveats,omitempty" jsonschema:"what to keep in mind: sponsored content, missing audio, outdated information"`
+	Sources   []string  `json:"sources,omitempty" jsonschema:"what the analysis was made from, e.g. caption, video_frames, transcript, image_text"`
+	UpdatedAt time.Time `json:"updatedAt,omitzero"`
+}
+
+type AnalysisInput struct {
+	ID string `json:"id" jsonschema:"item id from search_library"`
+	Analysis
+}
+
+type AnalysisOutput struct {
+	ID      string `json:"id"`
+	Created bool   `json:"created" jsonschema:"false if the item already had an analysis (it was replaced)"`
 }
 
 type SearchInput struct {
@@ -184,8 +217,9 @@ type SearchInput struct {
 }
 
 type SearchOutput struct {
-	Results []Result `json:"results"`
-	Mode    string   `json:"mode" jsonschema:"semantic, semantic+rerank or keyword"`
+	Results  []Result `json:"results"`
+	Mode     string   `json:"mode" jsonschema:"semantic, semantic+rerank or keyword"`
+	Reminder string   `json:"reminder,omitempty" jsonschema:"a note to pass on to the user once per conversation"`
 }
 
 type ItemInput struct {
@@ -194,8 +228,9 @@ type ItemInput struct {
 
 type ItemOutput struct {
 	Result
-	Description *string  `json:"description"`
-	Related     []Result `json:"related" jsonschema:"items most similar to this one"`
+	Description *string   `json:"description"`
+	Analysis    *Analysis `json:"analysis,omitempty" jsonschema:"what is known about the item's content, when it has been analyzed"`
+	Related     []Result  `json:"related" jsonschema:"items most similar to this one"`
 }
 
 type NeighborsInput struct {
@@ -223,14 +258,16 @@ func (s *Server) addTools() {
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true}
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name:        "search_library",
-		Description: "Search the user's saved posts and links by meaning. Returns compact results; use get_item for details.",
+		Name: "search_library",
+		Description: "Search the user's saved posts and links by meaning. Call it on your own whenever the user is planning, " +
+			"deciding, creating, buying or learning something their saves could help with, not only when they mention a save. " +
+			"Results include each save's summary and useWhen situations; use get_item for details.",
 		Annotations: readOnly,
 	}, s.search)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "get_item",
-		Description: "Get one saved item with its full note and the items most similar to it.",
+		Description: "Get one saved item with its full note, its analysis if it has one, and the items most similar to it.",
 		Annotations: readOnly,
 	}, s.getItem)
 
@@ -246,6 +283,21 @@ func (s *Server) addTools() {
 		Description: "Save a link to the user's library, with a short note on what it's about. Only when the user asks to save something.",
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: &f, IdempotentHint: true},
 	}, s.save)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "save_analysis",
+		Description: "Record what a saved item contains: a summary, the concrete details, tags, the situations it's useful in and " +
+			"anything to keep in mind. Write it from content the user showed you or that you opened yourself; never guess " +
+			"from the link alone. Replaces the item's previous analysis. The user's own note stays as it is.",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: &f, IdempotentHint: true},
+	}, s.saveAnalysis)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "get_analysis_queue",
+		Description: "List the saves that need an analysis (never analyzed, or saved again since), with when the user " +
+			"last analyzed their library and whether a reminder is due. Use it to work through their saves with save_analysis.",
+		Annotations: readOnly,
+	}, s.analysisQueue)
 }
 
 func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in SearchInput) (*mcp.CallToolResult, SearchOutput, error) {
@@ -298,7 +350,9 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in Search
 			}
 			out.Mode = "semantic"
 			for _, r := range rows {
-				out.Results = append(out.Results, result(r.ID, r.Url, r.Platform, r.Description, r.CategoryName, r.CreatedAt, r.Score))
+				res := result(r.ID, r.Url, r.Platform, r.Description, r.CategoryName, r.CreatedAt, r.Score)
+				res.Summary, res.UseWhen = deref(r.AnalysisSummary), r.AnalysisUseWhen
+				out.Results = append(out.Results, res)
 			}
 			if s.o.Rerank != nil && len(out.Results) > 1 {
 				if reordered, err := s.rerank(ctx, q, out.Results); err == nil {
@@ -310,6 +364,7 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in Search
 			if len(out.Results) > limit {
 				out.Results = out.Results[:limit]
 			}
+			out.Reminder = s.reminderFor(ctx, user)
 			return nil, out, nil
 		}
 		s.o.Logger.WarnContext(ctx, "mcp search: embedding failed, using keywords", "err", err)
@@ -323,8 +378,11 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in Search
 	}
 	out.Mode = "keyword"
 	for _, r := range rows {
-		out.Results = append(out.Results, result(r.ID, r.Url, r.Platform, r.Description, r.CategoryName, r.CreatedAt, 0))
+		res := result(r.ID, r.Url, r.Platform, r.Description, r.CategoryName, r.CreatedAt, 0)
+		res.Summary, res.UseWhen = deref(r.AnalysisSummary), r.AnalysisUseWhen
+		out.Results = append(out.Results, res)
 	}
+	out.Reminder = s.reminderFor(ctx, user)
 	return nil, out, nil
 }
 
@@ -348,6 +406,17 @@ func (s *Server) getItem(ctx context.Context, req *mcp.CallToolRequest, in ItemI
 		Result:      result(it.ID, it.Url, it.Platform, it.Description, it.CategoryName, it.CreatedAt, 0),
 		Description: it.Description,
 		Related:     []Result{},
+	}
+	a, err := s.o.Queries.GetItemAnalysis(ctx, db.GetItemAnalysisParams{ItemID: id, UserID: user})
+	switch {
+	case err == nil:
+		out.Analysis = &Analysis{
+			Summary: a.Summary, Details: deref(a.Details), Tags: a.Tags, UseWhen: a.UseWhen,
+			Actions: a.Actions, Caveats: deref(a.Caveats), Sources: a.Sources, UpdatedAt: a.UpdatedAt,
+		}
+		out.Summary = a.Summary
+	case !errors.Is(err, pgx.ErrNoRows):
+		return nil, out, err
 	}
 	local, err := s.neighborhood(ctx, user, id, 1)
 	if err != nil {
@@ -460,6 +529,138 @@ func (s *Server) save(ctx context.Context, req *mcp.CallToolRequest, in SaveInpu
 	return nil, SaveOutput{ID: row.ID.String(), URL: norm, Created: row.Inserted}, nil
 }
 
+// Limits for save_analysis, matching the table's checks.
+const (
+	maxSummary = 1000
+	maxDetails = 8000
+	maxCaveats = 1000
+	maxTags    = 20
+	maxList    = 10
+	maxEntry   = 200 // runes per tag, situation, action or source
+)
+
+func (s *Server) saveAnalysis(ctx context.Context, req *mcp.CallToolRequest, in AnalysisInput) (*mcp.CallToolResult, AnalysisOutput, error) {
+	user, err := userFrom(req)
+	if err != nil {
+		return nil, AnalysisOutput{}, err
+	}
+	id, err := uuid.Parse(in.ID)
+	if err != nil {
+		return nil, AnalysisOutput{}, errors.New("unknown item id")
+	}
+	summary := clip(strings.TrimSpace(in.Summary), maxSummary)
+	if summary == "" {
+		return nil, AnalysisOutput{}, errors.New("summary is required")
+	}
+	// Check ownership before spending anything on an embedding.
+	if _, err := s.o.Queries.GetItem(ctx, db.GetItemParams{ID: id, UserID: user}); errors.Is(err, pgx.ErrNoRows) {
+		return nil, AnalysisOutput{}, errors.New("unknown item id")
+	} else if err != nil {
+		return nil, AnalysisOutput{}, err
+	}
+	tags := cleanList(in.Tags, maxTags, true)
+	useWhen := cleanList(in.UseWhen, maxList, false)
+	params := db.UpsertItemAnalysisParams{
+		ItemID: id, UserID: user, Summary: summary,
+		Details: optional(in.Details, maxDetails), Caveats: optional(in.Caveats, maxCaveats),
+		Tags: tags, UseWhen: useWhen, Actions: cleanList(in.Actions, maxList, false),
+		Sources: cleanList(in.Sources, maxList, true),
+	}
+
+	// One small embedding of what the item is about, charged like a search.
+	// Without embeddings or credits the analysis is still saved and found by
+	// keyword search.
+	embed := s.o.Embed != nil
+	if embed && s.o.Credits != nil {
+		if embed, err = s.o.Credits.CanSpend(ctx, user); err != nil {
+			return nil, AnalysisOutput{}, err
+		}
+		if embed {
+			var meter *ai.Meter
+			ctx, meter = ai.WithMeter(ctx)
+			defer func() {
+				if cerr := s.o.Credits.Charge(context.WithoutCancel(ctx), user, "analysis", &id, meter); cerr != nil {
+					s.o.Logger.ErrorContext(ctx, "mcp save_analysis: charge credits", "err", cerr)
+				}
+			}()
+		}
+	}
+	if embed {
+		if vecs, err := s.o.Embed.Embed(ctx, analysisText(summary, tags, useWhen)); err == nil {
+			v := ai.VectorLiteral(vecs[0])
+			params.Embedding = &v
+		} else {
+			s.o.Logger.WarnContext(ctx, "mcp save_analysis: embedding failed, saving without it", "err", err)
+		}
+	}
+
+	row, err := s.o.Queries.UpsertItemAnalysis(ctx, params)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, AnalysisOutput{}, errors.New("unknown item id")
+	}
+	if err != nil {
+		return nil, AnalysisOutput{}, err
+	}
+	return nil, AnalysisOutput{ID: row.ItemID.String(), Created: row.Inserted}, nil
+}
+
+// analysisText is what gets embedded for an analysis: what the item is about
+// and when it's useful. The long details stay out to keep the input small.
+func analysisText(summary string, tags, useWhen []string) string {
+	parts := []string{summary}
+	if len(tags) > 0 {
+		parts = append(parts, strings.Join(tags, ", "))
+	}
+	if len(useWhen) > 0 {
+		parts = append(parts, strings.Join(useWhen, "; "))
+	}
+	return strings.Join(parts, "\n")
+}
+
+// cleanList trims entries, drops empty ones and duplicates (ignoring case),
+// clips each entry and keeps at most limit of them.
+func cleanList(in []string, limit int, lower bool) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, e := range in {
+		e = clip(strings.TrimSpace(e), maxEntry)
+		if lower {
+			e = strings.ToLower(e)
+		}
+		k := strings.ToLower(e)
+		if e == "" || seen[k] {
+			continue
+		}
+		seen[k] = true
+		out = append(out, e)
+		if len(out) == limit {
+			break
+		}
+	}
+	return out
+}
+
+func optional(s string, limit int) *string {
+	if s = clip(strings.TrimSpace(s), limit); s == "" {
+		return nil
+	}
+	return &s
+}
+
+func clip(s string, limit int) string {
+	if r := []rune(s); len(r) > limit {
+		return strings.TrimSpace(string(r[:limit]))
+	}
+	return s
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 const rerankInstructions = "Which saved item best matches what the user is looking for?"
 
 // rerank asks Jev to choose among the candidates and orders them by its
@@ -470,6 +671,9 @@ func (s *Server) rerank(ctx context.Context, query string, cands []Result) ([]Re
 		desc := c.Title
 		if c.Category != "" {
 			desc += " (" + c.Category + ")"
+		}
+		if c.Summary != "" {
+			desc += ": " + c.Summary
 		}
 		options[strconv.Itoa(i+1)] = desc
 	}
