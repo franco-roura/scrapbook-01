@@ -6,7 +6,8 @@ Scrapbook/01 is a [Model Context Protocol](https://modelcontextprotocol.io) serv
 Claude, ChatGPT or any MCP client, and your assistant can look things up in what you saved.
 
 **On this page:** [Connect it](#connect-it) · [What it can do](#what-it-can-do) ·
-[Analyses](#analyses) · [Who pays for what](#who-pays-for-what) · [Sign-in and access](#sign-in-and-access) ·
+[Analyses](#analyses) · [Bringing saves up unasked](#bringing-saves-up-unasked) ·
+[Who pays for what](#who-pays-for-what) · [Sign-in and access](#sign-in-and-access) ·
 [For self-hosters](#for-self-hosters)
 
 ## Connect it
@@ -36,11 +37,12 @@ Then ask in plain words:
 
 | Tool | What it does |
 | --- | --- |
-| `search_library` | Searches your saves by meaning, optionally within one category. Returns short results |
+| `search_library` | Searches your saves by meaning, optionally within one category. Returns short results, with each save's summary and `useWhen` situations |
 | `get_item` | One save, with its full note, its analysis if it has one, and the saves most similar to it |
 | `get_neighbors` | Saves linked to one in the graph, one or two hops out, with their categories |
 | `save_item` | Saves a link with a note, sorted like any other save. Only when you ask |
 | `save_analysis` | Records what a save contains (see [Analyses](#analyses)). Replaces the previous one |
+| `get_analysis_queue` | The saves that still need an analysis, and when you last analyzed your library |
 
 Search embeds the question once and ranks your saves with pgvector. When the server has a Jev key, Jev
 then re-ranks the top 10 by how well each answers the question (if Jev fails, the vector order
@@ -75,6 +77,29 @@ most one analysis, and saving another replaces it.
 
 `useWhen` is what makes the assistant proactive: when what you're doing matches a situation in an
 analysis, a search finds that save even if you never asked for it by name.
+
+## Bringing saves up unasked
+
+The server's instructions, which the assistant reads when it connects, ask it to:
+
+- **Search on its own** whenever you're planning, deciding, creating, buying or learning something
+  (a trip, a meal, a purchase, a campaign, a workout), even if you never mention your saves, and
+  again when the topic changes.
+- **Mention a save when the conversation matches its `useWhen`**, at most three at a time, one line
+  each: what it is, why it fits now, and its link. It opens a save with `get_item` before relying on
+  it, turns its actions into next steps and says when it's sponsored or possibly outdated.
+- **Not repeat itself:** a save comes up once per conversation, and small talk doesn't trigger a
+  search.
+- **Write specific `useWhen` situations** when it analyzes, written the way you'd describe what
+  you're doing ("planning a trip to Lisbon", not "travel").
+
+### The analysis reminder
+
+Every 15 days, saves that arrived since your last analysis are worth a pass. When some saves have
+no analysis (or you saved them again with a new note) and your last analysis is 15 or more days
+old, or you never did one, `search_library` results carry a `reminder`. The assistant passes it on
+once per conversation and offers to go through `get_analysis_queue` with you right then. An MCP
+server can't start a conversation, so the reminder shows up the next time you use the assistant.
 
 ## Who pays for what
 

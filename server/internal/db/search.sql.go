@@ -14,7 +14,7 @@ import (
 
 const searchItemsByText = `-- name: SearchItemsByText :many
 SELECT i.id, i.url, i.platform, i.description, i.created_at, c.name AS category_name,
-       a.summary AS analysis_summary, m.hits
+       a.summary AS analysis_summary, a.use_when AS analysis_use_when, m.hits
 FROM items i
 LEFT JOIN categories c ON c.id = i.category_id
 LEFT JOIN item_analyses a ON a.item_id = i.id
@@ -45,6 +45,7 @@ type SearchItemsByTextRow struct {
 	CreatedAt       time.Time
 	CategoryName    *string
 	AnalysisSummary *string
+	AnalysisUseWhen []string
 	Hits            int32
 }
 
@@ -72,6 +73,7 @@ func (q *Queries) SearchItemsByText(ctx context.Context, arg SearchItemsByTextPa
 			&i.CreatedAt,
 			&i.CategoryName,
 			&i.AnalysisSummary,
+			&i.AnalysisUseWhen,
 			&i.Hits,
 		); err != nil {
 			return nil, err
@@ -106,7 +108,7 @@ WITH hits AS (
     SELECT hits.id, max(hits.score)::float8 AS score FROM hits GROUP BY hits.id
 )
 SELECT i.id, i.url, i.platform, i.description, i.created_at, c.name AS category_name,
-       a.summary AS analysis_summary, best.score
+       a.summary AS analysis_summary, a.use_when AS analysis_use_when, best.score
 FROM best
 JOIN items i ON i.id = best.id
 LEFT JOIN categories c ON c.id = i.category_id
@@ -130,6 +132,7 @@ type SearchItemsByVectorRow struct {
 	CreatedAt       time.Time
 	CategoryName    *string
 	AnalysisSummary *string
+	AnalysisUseWhen []string
 	Score           float64
 }
 
@@ -159,6 +162,7 @@ func (q *Queries) SearchItemsByVector(ctx context.Context, arg SearchItemsByVect
 			&i.CreatedAt,
 			&i.CategoryName,
 			&i.AnalysisSummary,
+			&i.AnalysisUseWhen,
 			&i.Score,
 		); err != nil {
 			return nil, err

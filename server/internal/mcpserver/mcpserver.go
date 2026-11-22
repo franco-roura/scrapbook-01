@@ -72,6 +72,11 @@ type Options struct {
 	PublicURL string
 	// AuthServer is the AuthKit domain, e.g. https://abc-123.authkit.app.
 	AuthServer string
+	// ReminderEvery is how long after the user's last analysis the assistant
+	// is asked to remind them to analyze their new saves. Default 15 days.
+	ReminderEvery time.Duration
+	// Now is the clock, for tests. Default time.Now.
+	Now func() time.Time
 }
 
 type Server struct {
@@ -79,16 +84,15 @@ type Server struct {
 	mcp *mcp.Server
 }
 
-const instructions = "The user's Scrapbook/01 library: posts and links they saved, each with a short note on what it's about, " +
-	"filed into categories. Some items also have an analysis (summary, details, tags and the situations they're useful in). " +
-	"Search it when the user's request could use something they saved before " +
-	"(recipes, trips, ideas, tips). Prefer their saved items over general knowledge when relevant, and link to them. " +
-	"When the user shows you what a saved item contains, or asks you to analyze their saves, record what you learned with " +
-	"save_analysis, and fill useWhen with the situations in which you should bring the item up."
-
 func New(o Options) *Server {
 	if o.Logger == nil {
 		o.Logger = slog.Default()
+	}
+	if o.ReminderEvery <= 0 {
+		o.ReminderEvery = DefaultReminderEvery
+	}
+	if o.Now == nil {
+		o.Now = time.Now
 	}
 	s := &Server{o: o}
 	s.mcp = mcp.NewServer(&mcp.Implementation{Name: "scrapbook01", Title: "Scrapbook/01", Version: "0.1.0"}, &mcp.ServerOptions{
@@ -173,14 +177,15 @@ func userFrom(req *mcp.CallToolRequest) (uuid.UUID, error) {
 // ---- tools ----
 
 type Result struct {
-	ID       string  `json:"id"`
-	Title    string  `json:"title" jsonschema:"what the user said the item is about, or its site when undescribed"`
-	Category string  `json:"category,omitempty"`
-	URL      string  `json:"url"`
-	Platform string  `json:"platform"`
-	SavedOn  string  `json:"savedOn" jsonschema:"date saved, YYYY-MM-DD"`
-	Score    float64 `json:"score,omitempty" jsonschema:"similarity to the query, 0 to 1 (semantic search only)"`
-	Summary  string  `json:"summary,omitempty" jsonschema:"the item's analysis summary, when it has one"`
+	ID       string   `json:"id"`
+	Title    string   `json:"title" jsonschema:"what the user said the item is about, or its site when undescribed"`
+	Category string   `json:"category,omitempty"`
+	URL      string   `json:"url"`
+	Platform string   `json:"platform"`
+	SavedOn  string   `json:"savedOn" jsonschema:"date saved, YYYY-MM-DD"`
+	Score    float64  `json:"score,omitempty" jsonschema:"similarity to the query, 0 to 1 (semantic search only)"`
+	Summary  string   `json:"summary,omitempty" jsonschema:"the item's analysis summary, when it has one"`
+	UseWhen  []string `json:"useWhen,omitempty" jsonschema:"situations in which the user wants this item brought up, from its analysis"`
 }
 
 // Analysis is what the user's assistant learned about an item's content.
@@ -212,8 +217,9 @@ type SearchInput struct {
 }
 
 type SearchOutput struct {
-	Results []Result `json:"results"`
-	Mode    string   `json:"mode" jsonschema:"semantic, semantic+rerank or keyword"`
+	Results  []Result `json:"results"`
+	Mode     string   `json:"mode" jsonschema:"semantic, semantic+rerank or keyword"`
+	Reminder string   `json:"reminder,omitempty" jsonschema:"a note to pass on to the user once per conversation"`
 }
 
 type ItemInput struct {
@@ -252,8 +258,10 @@ func (s *Server) addTools() {
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true}
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
-		Name:        "search_library",
-		Description: "Search the user's saved posts and links by meaning. Returns compact results; use get_item for details.",
+		Name: "search_library",
+		Description: "Search the user's saved posts and links by meaning. Call it on your own whenever the user is planning, " +
+			"deciding, creating, buying or learning something their saves could help with, not only when they mention a save. " +
+			"Results include each save's summary and useWhen situations; use get_item for details.",
 		Annotations: readOnly,
 	}, s.search)
 
@@ -283,6 +291,13 @@ func (s *Server) addTools() {
 			"from the link alone. Replaces the item's previous analysis. The user's own note stays as it is.",
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: &f, IdempotentHint: true},
 	}, s.saveAnalysis)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name: "get_analysis_queue",
+		Description: "List the saves that need an analysis (never analyzed, or saved again since), with when the user " +
+			"last analyzed their library and whether a reminder is due. Use it to work through their saves with save_analysis.",
+		Annotations: readOnly,
+	}, s.analysisQueue)
 }
 
 func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in SearchInput) (*mcp.CallToolResult, SearchOutput, error) {
@@ -336,7 +351,7 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in Search
 			out.Mode = "semantic"
 			for _, r := range rows {
 				res := result(r.ID, r.Url, r.Platform, r.Description, r.CategoryName, r.CreatedAt, r.Score)
-				res.Summary = deref(r.AnalysisSummary)
+				res.Summary, res.UseWhen = deref(r.AnalysisSummary), r.AnalysisUseWhen
 				out.Results = append(out.Results, res)
 			}
 			if s.o.Rerank != nil && len(out.Results) > 1 {
@@ -349,6 +364,7 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in Search
 			if len(out.Results) > limit {
 				out.Results = out.Results[:limit]
 			}
+			out.Reminder = s.reminderFor(ctx, user)
 			return nil, out, nil
 		}
 		s.o.Logger.WarnContext(ctx, "mcp search: embedding failed, using keywords", "err", err)
@@ -363,9 +379,10 @@ func (s *Server) search(ctx context.Context, req *mcp.CallToolRequest, in Search
 	out.Mode = "keyword"
 	for _, r := range rows {
 		res := result(r.ID, r.Url, r.Platform, r.Description, r.CategoryName, r.CreatedAt, 0)
-		res.Summary = deref(r.AnalysisSummary)
+		res.Summary, res.UseWhen = deref(r.AnalysisSummary), r.AnalysisUseWhen
 		out.Results = append(out.Results, res)
 	}
+	out.Reminder = s.reminderFor(ctx, user)
 	return nil, out, nil
 }
 

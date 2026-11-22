@@ -24,7 +24,7 @@ WITH hits AS (
     SELECT hits.id, max(hits.score)::float8 AS score FROM hits GROUP BY hits.id
 )
 SELECT i.id, i.url, i.platform, i.description, i.created_at, c.name AS category_name,
-       a.summary AS analysis_summary, best.score
+       a.summary AS analysis_summary, a.use_when AS analysis_use_when, best.score
 FROM best
 JOIN items i ON i.id = best.id
 LEFT JOIN categories c ON c.id = i.category_id
@@ -36,7 +36,7 @@ LIMIT @lim;
 -- Fallback when embeddings aren't available: items whose description, URL,
 -- category or analysis contain the most query words.
 SELECT i.id, i.url, i.platform, i.description, i.created_at, c.name AS category_name,
-       a.summary AS analysis_summary, m.hits
+       a.summary AS analysis_summary, a.use_when AS analysis_use_when, m.hits
 FROM items i
 LEFT JOIN categories c ON c.id = i.category_id
 LEFT JOIN item_analyses a ON a.item_id = i.id

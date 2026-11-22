@@ -12,6 +12,38 @@ import (
 	"github.com/google/uuid"
 )
 
+const getAnalysisStatus = `-- name: GetAnalysisStatus :one
+SELECT COALESCE((SELECT max(a.updated_at) FROM item_analyses a WHERE a.user_id = $1),
+                'epoch'::timestamptz)::timestamptz AS last_analysis_at,
+       (SELECT count(*) FROM item_analyses a WHERE a.user_id = $1)::int AS analyzed,
+       (SELECT count(*) FROM items i WHERE i.user_id = $1)::int AS total,
+       (SELECT count(*) FROM items i
+        LEFT JOIN item_analyses a ON a.item_id = i.id
+        WHERE i.user_id = $1 AND (a.item_id IS NULL OR a.updated_at < i.updated_at))::int AS pending
+`
+
+type GetAnalysisStatusRow struct {
+	LastAnalysisAt time.Time
+	Analyzed       int32
+	Total          int32
+	Pending        int32
+}
+
+// When the user's library was last analyzed, and how many saves still need
+// an analysis: never analyzed, or saved again (a new note) since.
+// last_analysis_at is only meaningful when analyzed > 0.
+func (q *Queries) GetAnalysisStatus(ctx context.Context, userID uuid.UUID) (GetAnalysisStatusRow, error) {
+	row := q.db.QueryRow(ctx, getAnalysisStatus, userID)
+	var i GetAnalysisStatusRow
+	err := row.Scan(
+		&i.LastAnalysisAt,
+		&i.Analyzed,
+		&i.Total,
+		&i.Pending,
+	)
+	return i, err
+}
+
 const getItemAnalysis = `-- name: GetItemAnalysis :one
 SELECT item_id, summary, details, tags, use_when, actions, caveats, sources, updated_at
 FROM item_analyses
@@ -50,6 +82,62 @@ func (q *Queries) GetItemAnalysis(ctx context.Context, arg GetItemAnalysisParams
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listItemsToAnalyze = `-- name: ListItemsToAnalyze :many
+SELECT i.id, i.url, i.platform, i.description, i.created_at, c.name AS category_name,
+       a.updated_at AS analyzed_at
+FROM items i
+LEFT JOIN categories c ON c.id = i.category_id
+LEFT JOIN item_analyses a ON a.item_id = i.id
+WHERE i.user_id = $1 AND (a.item_id IS NULL OR a.updated_at < i.updated_at)
+ORDER BY (a.item_id IS NOT NULL), i.created_at DESC, i.id
+LIMIT $2
+`
+
+type ListItemsToAnalyzeParams struct {
+	UserID uuid.UUID
+	Lim    int32
+}
+
+type ListItemsToAnalyzeRow struct {
+	ID           uuid.UUID
+	Url          string
+	Platform     string
+	Description  *string
+	CreatedAt    time.Time
+	CategoryName *string
+	AnalyzedAt   *time.Time
+}
+
+// Saves that need an analysis: never-analyzed ones first, newest first, then
+// the ones saved again since their analysis.
+func (q *Queries) ListItemsToAnalyze(ctx context.Context, arg ListItemsToAnalyzeParams) ([]ListItemsToAnalyzeRow, error) {
+	rows, err := q.db.Query(ctx, listItemsToAnalyze, arg.UserID, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListItemsToAnalyzeRow
+	for rows.Next() {
+		var i ListItemsToAnalyzeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Url,
+			&i.Platform,
+			&i.Description,
+			&i.CreatedAt,
+			&i.CategoryName,
+			&i.AnalyzedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const upsertItemAnalysis = `-- name: UpsertItemAnalysis :one

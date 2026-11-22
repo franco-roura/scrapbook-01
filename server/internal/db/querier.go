@@ -32,6 +32,10 @@ type Querier interface {
 	EnsureStarterCredits(ctx context.Context, arg EnsureStarterCreditsParams) (int64, error)
 	// The user's category whose name is closest in meaning to a proposed name.
 	FindSimilarCategory(ctx context.Context, arg FindSimilarCategoryParams) (FindSimilarCategoryRow, error)
+	// When the user's library was last analyzed, and how many saves still need
+	// an analysis: never analyzed, or saved again (a new note) since.
+	// last_analysis_at is only meaningful when analyzed > 0.
+	GetAnalysisStatus(ctx context.Context, userID uuid.UUID) (GetAnalysisStatusRow, error)
 	GetCreditBalance(ctx context.Context, userID uuid.UUID) (int64, error)
 	GetItem(ctx context.Context, arg GetItemParams) (GetItemRow, error)
 	GetItemAnalysis(ctx context.Context, arg GetItemAnalysisParams) (GetItemAnalysisRow, error)
@@ -60,6 +64,9 @@ type Querier interface {
 	ListGraphItems(ctx context.Context, arg ListGraphItemsParams) ([]ListGraphItemsRow, error)
 	// Newest first, paged with a (created_at, id) cursor.
 	ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error)
+	// Saves that need an analysis: never-analyzed ones first, newest first, then
+	// the ones saved again since their analysis.
+	ListItemsToAnalyze(ctx context.Context, arg ListItemsToAnalyzeParams) ([]ListItemsToAnalyzeRow, error)
 	MarkClassified(ctx context.Context, arg MarkClassifiedParams) (int64, error)
 	// Fallback when embeddings aren't available: items whose description, URL,
 	// category or analysis contain the most query words.

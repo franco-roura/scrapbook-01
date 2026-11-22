@@ -239,7 +239,7 @@ func TestTools(t *testing.T) {
 	for _, tl := range tools.Tools {
 		names = append(names, tl.Name)
 	}
-	if strings.Join(names, ",") != "get_item,get_neighbors,save_analysis,save_item,search_library" {
+	if strings.Join(names, ",") != "get_analysis_queue,get_item,get_neighbors,save_analysis,save_item,search_library" {
 		t.Fatalf("tools = %v", names)
 	}
 
@@ -457,5 +457,96 @@ func TestAnalysisKeywordSearch(t *testing.T) {
 	}](t, cs, "search_library", map[string]any{"query": "mascarpone"})
 	if search.Mode != "keyword" || len(search.Results) != 1 || search.Results[0].ID != f.ids["cake"].String() || search.Results[0].Summary == "" {
 		t.Fatalf("keyword search through the analysis: %+v", search)
+	}
+}
+
+func TestAnalysisQueueAndReminder(t *testing.T) {
+	now := time.Now()
+	clock := &now
+	f := setup(t, bagOfWords{}, func(o *mcpserver.Options) { o.Now = func() time.Time { return *clock } })
+	cs := f.connect(t, f.user)
+
+	type queue struct {
+		LastAnalysisOn string
+		DaysSince      *int `json:"daysSinceLastAnalysis"`
+		Total, Pending int
+		Due            bool
+		Items          []struct{ ID, AnalyzedOn string }
+	}
+	type found struct {
+		Results []struct {
+			ID      string
+			UseWhen []string
+		}
+		Reminder string
+	}
+
+	// Nothing analyzed yet: every save is in the queue and a reminder is due.
+	q, _ := call[queue](t, cs, "get_analysis_queue", map[string]any{"limit": 2})
+	if !q.Due || q.Total != 3 || q.Pending != 3 || q.LastAnalysisOn != "" || q.DaysSince != nil || len(q.Items) != 2 {
+		t.Fatalf("fresh library: %+v", q)
+	}
+	s, _ := call[found](t, cs, "search_library", map[string]any{"query": "lemon cake"})
+	if !strings.Contains(s.Reminder, "never analyzed") {
+		t.Fatalf("search should carry the first reminder: %+v", s)
+	}
+
+	// Analyze all three: no reminder, empty queue, and search shows useWhen.
+	for key, id := range f.ids {
+		if _, ok := call[struct{}](t, cs, "save_analysis", map[string]any{
+			"id": id.String(), "summary": "About " + key + ".", "useWhen": []string{"deciding what to do with " + key},
+		}); !ok {
+			t.Fatalf("save_analysis %s failed", key)
+		}
+	}
+	q, _ = call[queue](t, cs, "get_analysis_queue", nil)
+	if q.Due || q.Pending != 0 || len(q.Items) != 0 || q.DaysSince == nil || *q.DaysSince != 0 {
+		t.Fatalf("after analyzing everything: %+v", q)
+	}
+	s, _ = call[found](t, cs, "search_library", map[string]any{"query": "lemon cake recipe", "limit": 1})
+	if s.Reminder != "" || len(s.Results) != 1 || len(s.Results[0].UseWhen) != 1 {
+		t.Fatalf("search after analyzing: %+v", s)
+	}
+
+	// A new save arrives. Within 15 days there's no reminder yet; after 15
+	// days there is, and the queue lists only the new save.
+	saved, _ := call[struct{ ID string }](t, cs, "save_item", map[string]any{"url": "https://example.com/soup", "note": "pumpkin soup"})
+	q, _ = call[queue](t, cs, "get_analysis_queue", nil)
+	if q.Due || q.Pending != 1 {
+		t.Fatalf("one new save, analyzed today: %+v", q)
+	}
+	// Half a day more, so the few milliseconds between taking now and the
+	// database's own clock don't turn 16 days into 15.
+	later := now.Add(16*24*time.Hour + 12*time.Hour)
+	clock = &later
+	q, _ = call[queue](t, cs, "get_analysis_queue", nil)
+	if !q.Due || q.Pending != 1 || len(q.Items) != 1 || q.Items[0].ID != saved.ID || q.DaysSince == nil || *q.DaysSince != 16 {
+		t.Fatalf("16 days later: %+v", q)
+	}
+	s, _ = call[found](t, cs, "search_library", map[string]any{"query": "soup"})
+	if !strings.Contains(s.Reminder, "16 days ago") {
+		t.Fatalf("search should remind after 15 days: %q", s.Reminder)
+	}
+
+	// Saving a link again with a new note puts it back in the queue.
+	call[struct{}](t, cs, "save_item", map[string]any{"url": "https://example.com/pasta", "note": "easy lemon pasta, the one with capers"})
+	q, _ = call[queue](t, cs, "get_analysis_queue", nil)
+	if q.Pending != 2 {
+		t.Fatalf("a re-saved link should need a new analysis: %+v", q)
+	}
+	var again bool
+	for _, it := range q.Items {
+		if it.ID == f.ids["pasta"].String() && it.AnalyzedOn != "" {
+			again = true
+		}
+	}
+	if !again {
+		t.Fatalf("pasta should be queued with its previous analysis date: %+v", q.Items)
+	}
+
+	// Another user's queue doesn't see these saves.
+	other, _ := call[queue](t, f.connect(t, uuid.New()), "get_analysis_queue", nil)
+	if other.Total != 0 || len(other.Items) != 0 || other.Due {
+		t.Fatalf("stranger's queue: %+v", other)
 	}
 }
