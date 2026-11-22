@@ -239,7 +239,7 @@ func TestTools(t *testing.T) {
 	for _, tl := range tools.Tools {
 		names = append(names, tl.Name)
 	}
-	if strings.Join(names, ",") != "get_item,get_neighbors,save_item,search_library" {
+	if strings.Join(names, ",") != "get_item,get_neighbors,save_analysis,save_item,search_library" {
 		t.Fatalf("tools = %v", names)
 	}
 
@@ -351,5 +351,111 @@ func TestRerank(t *testing.T) {
 	got, _ = call[out](t, f.connect(t, f.user), "search_library", args)
 	if got.Mode != "semantic" || len(got.Results) != 2 || got.Results[0].ID != f.ids["pasta"].String() {
 		t.Fatalf("rerank failure should keep vector order: %+v", got)
+	}
+}
+
+func TestAnalysis(t *testing.T) {
+	f := setup(t, bagOfWords{})
+	cs := f.connect(t, f.user)
+	trip := f.ids["trip"].String()
+
+	type analysis struct {
+		Summary, Details, Caveats string
+		Tags, UseWhen, Actions    []string
+		Sources                   []string
+	}
+	args := map[string]any{
+		"id":      trip,
+		"summary": "A two-day plan for Colonia: the old town walk, the lighthouse at sunset and a riverside dinner.",
+		"details": "Day 1: Calle de los Suspiros, lighthouse. Day 2: bike to Real de San Carlos.",
+		"tags":    []string{"Travel", "travel", "Uruguay"},
+		"useWhen": []string{"planning a weekend away", "looking for a romantic getaway"},
+		"actions": []string{"book the ferry early"},
+		"caveats": "Prices are from last summer.",
+		"sources": []string{"caption", "video_frames"},
+	}
+	saved, ok := call[struct {
+		ID      string
+		Created bool
+	}](t, cs, "save_analysis", args)
+	if !ok || !saved.Created || saved.ID != trip {
+		t.Fatalf("save_analysis: %+v (ok %v)", saved, ok)
+	}
+
+	item, _ := call[struct {
+		Title    string
+		Summary  string
+		Analysis *analysis
+	}](t, cs, "get_item", map[string]any{"id": trip})
+	if item.Title != "weekend trip to colonia del sacramento" || item.Analysis == nil ||
+		item.Analysis.Details == "" || strings.Join(item.Analysis.Tags, ",") != "travel,uruguay" ||
+		len(item.Analysis.UseWhen) != 2 || item.Summary != item.Analysis.Summary {
+		t.Fatalf("get_item analysis: %+v", item)
+	}
+
+	// The analysis makes the item findable by what it contains, not only by
+	// the user's note, and search shows its summary.
+	type found struct {
+		Results []struct{ ID, Summary string }
+		Mode    string
+	}
+	search, _ := call[found](t, cs, "search_library", map[string]any{"query": "romantic getaway lighthouse", "limit": 1})
+	if search.Mode != "semantic" || len(search.Results) != 1 || search.Results[0].ID != trip || search.Results[0].Summary == "" {
+		t.Fatalf("semantic search through the analysis: %+v", search)
+	}
+
+	// Saving again replaces the analysis.
+	again, _ := call[struct{ Created bool }](t, cs, "save_analysis", map[string]any{"id": trip, "summary": "A shorter plan."})
+	if again.Created {
+		t.Fatal("a second save_analysis created a new analysis")
+	}
+	item, _ = call[struct {
+		Title    string
+		Summary  string
+		Analysis *analysis
+	}](t, cs, "get_item", map[string]any{"id": trip})
+	if item.Analysis == nil || item.Analysis.Summary != "A shorter plan." || len(item.Analysis.Tags) != 0 || item.Analysis.Details != "" {
+		t.Fatalf("replaced analysis: %+v", item.Analysis)
+	}
+
+	// Items without an analysis don't get one.
+	plain, _ := call[struct{ Analysis *analysis }](t, cs, "get_item", map[string]any{"id": f.ids["pasta"].String()})
+	if plain.Analysis != nil {
+		t.Fatalf("pasta has an analysis: %+v", plain.Analysis)
+	}
+
+	// A summary is required, and nobody can analyze someone else's item.
+	if _, ok := call[struct{}](t, cs, "save_analysis", map[string]any{"id": trip, "summary": "  "}); ok {
+		t.Fatal("saved an analysis without a summary")
+	}
+	stranger := f.connect(t, uuid.New())
+	if _, ok := call[struct{}](t, stranger, "save_analysis", map[string]any{"id": trip, "summary": "Hijacked."}); ok {
+		t.Fatal("a stranger analyzed the item")
+	}
+	item, _ = call[struct {
+		Title    string
+		Summary  string
+		Analysis *analysis
+	}](t, cs, "get_item", map[string]any{"id": trip})
+	if item.Analysis == nil || item.Analysis.Summary != "A shorter plan." {
+		t.Fatalf("stranger changed the analysis: %+v", item.Analysis)
+	}
+}
+
+func TestAnalysisKeywordSearch(t *testing.T) {
+	f := setup(t, nil) // no embeddings: the analysis is saved without one
+	cs := f.connect(t, f.user)
+	if _, ok := call[struct{}](t, cs, "save_analysis", map[string]any{
+		"id": f.ids["cake"].String(), "summary": "A three-layer lemon cake with mascarpone frosting.",
+		"useWhen": []string{"baking for a birthday"},
+	}); !ok {
+		t.Fatal("save_analysis without embeddings failed")
+	}
+	search, _ := call[struct {
+		Results []struct{ ID, Summary string }
+		Mode    string
+	}](t, cs, "search_library", map[string]any{"query": "mascarpone"})
+	if search.Mode != "keyword" || len(search.Results) != 1 || search.Results[0].ID != f.ids["cake"].String() || search.Results[0].Summary == "" {
+		t.Fatalf("keyword search through the analysis: %+v", search)
 	}
 }

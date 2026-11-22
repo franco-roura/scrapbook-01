@@ -80,3 +80,18 @@ type Item struct {
 	PreviewSite        *string
 	PreviewFetchedAt   *time.Time
 }
+
+type ItemAnalysis struct {
+	ItemID    uuid.UUID
+	UserID    uuid.UUID
+	Summary   string
+	Details   *string
+	Tags      []string
+	UseWhen   []string
+	Actions   []string
+	Caveats   *string
+	Sources   []string
+	Embedding *pgvector.Vector
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
